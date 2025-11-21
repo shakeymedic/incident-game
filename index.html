@@ -20,10 +20,10 @@
         .zone-card.drag-over { background-color: #f0f9ff; border-color: #0284c7; box-shadow: 0 0 0 2px #0284c7 inset; }
         
         /* NHS / WMEBEM Standard Colours */
-        .p1-bg { background-color: #fecaca; border-left: 6px solid #dc2626; } /* Red - Immediate */
-        .p2-bg { background-color: #fef3c7; border-left: 6px solid #d97706; } /* Yellow - Urgent */
-        .p3-bg { background-color: #d1fae5; border-left: 6px solid #059669; } /* Green - Delayed */
-        .dead-bg { background-color: #e2e8f0; border-left: 6px solid #1e293b; } /* Black/Grey - Expectant/Dead */
+        .p1-bg { background-color: #fecaca; border-left: 4px solid #dc2626; } /* Red - Immediate */
+        .p2-bg { background-color: #fef3c7; border-left: 4px solid #d97706; } /* Yellow - Urgent */
+        .p3-bg { background-color: #d1fae5; border-left: 4px solid #059669; } /* Green - Delayed */
+        .dead-bg { background-color: #e2e8f0; border-left: 4px solid #1e293b; } /* Black/Grey - Expectant/Dead */
         
         .vital-red { color: #dc2626; font-weight: 900; animation: pulse 2s infinite; }
         .vital-amber { color: #d97706; font-weight: bold; }
@@ -36,12 +36,12 @@
         }
 
         /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
-        .logo-h { height: 3.5rem; width: auto; }
+        .logo-h { height: 3rem; width: auto; }
     </style>
 </head>
 <body>
@@ -133,18 +133,18 @@
         // --- COMPONENTS ---
 
         const StickFigure = ({ injuryLoc }) => (
-            <svg width="40" height="70" viewBox="0 0 100 100" className="overflow-visible opacity-90">
-                <circle cx="50" cy="15" r="12" fill="none" stroke="currentColor" strokeWidth="4" />
-                <line x1="50" y1="27" x2="50" y2="60" stroke="currentColor" strokeWidth="4" />
-                <line x1="50" y1="35" x2="20" y2="50" stroke="currentColor" strokeWidth="4" />
-                <line x1="50" y1="35" x2="80" y2="50" stroke="currentColor" strokeWidth="4" />
-                <line x1="50" y1="60" x2="30" y2="95" stroke="currentColor" strokeWidth="4" />
-                <line x1="50" y1="60" x2="70" y2="95" stroke="currentColor" strokeWidth="4" />
-                {injuryLoc === 'head' && <circle cx="50" cy="15" r="15" stroke="red" strokeWidth="3" fill="none" className="animate-pulse" />}
-                {injuryLoc === 'chest' && <circle cx="50" cy="40" r="12" stroke="red" strokeWidth="3" fill="none" className="animate-pulse" />}
-                {injuryLoc === 'abdo' && <circle cx="50" cy="55" r="10" stroke="red" strokeWidth="3" fill="none" className="animate-pulse" />}
-                {injuryLoc === 'arm' && <circle cx="20" cy="50" r="8" stroke="red" strokeWidth="3" fill="none" className="animate-pulse" />}
-                {injuryLoc === 'leg' && <circle cx="30" cy="90" r="8" stroke="red" strokeWidth="3" fill="none" className="animate-pulse" />}
+            <svg width="30" height="50" viewBox="0 0 100 100" className="overflow-visible opacity-90">
+                <circle cx="50" cy="15" r="12" fill="none" stroke="currentColor" strokeWidth="6" />
+                <line x1="50" y1="27" x2="50" y2="60" stroke="currentColor" strokeWidth="6" />
+                <line x1="50" y1="35" x2="20" y2="50" stroke="currentColor" strokeWidth="6" />
+                <line x1="50" y1="35" x2="80" y2="50" stroke="currentColor" strokeWidth="6" />
+                <line x1="50" y1="60" x2="30" y2="95" stroke="currentColor" strokeWidth="6" />
+                <line x1="50" y1="60" x2="70" y2="95" stroke="currentColor" strokeWidth="6" />
+                {injuryLoc === 'head' && <circle cx="50" cy="15" r="15" stroke="red" strokeWidth="4" fill="none" className="animate-pulse" />}
+                {injuryLoc === 'chest' && <circle cx="50" cy="40" r="12" stroke="red" strokeWidth="4" fill="none" className="animate-pulse" />}
+                {injuryLoc === 'abdo' && <circle cx="50" cy="55" r="10" stroke="red" strokeWidth="4" fill="none" className="animate-pulse" />}
+                {injuryLoc === 'arm' && <circle cx="20" cy="50" r="8" stroke="red" strokeWidth="4" fill="none" className="animate-pulse" />}
+                {injuryLoc === 'leg' && <circle cx="30" cy="90" r="8" stroke="red" strokeWidth="4" fill="none" className="animate-pulse" />}
             </svg>
         );
 
@@ -156,11 +156,11 @@
                 return 'text-gray-600';
             };
             return (
-                <div className="grid grid-cols-2 gap-x-2 text-[10px] font-mono mt-1 bg-white/50 p-1 rounded">
+                <div className="grid grid-cols-2 gap-x-1 text-[9px] font-mono mt-0.5 bg-white/50 p-0.5 rounded leading-none">
                     <div>HR:<span className={getVitalClass(vitals.hr, 'hr')}>{vitals.hr}</span></div>
                     <div>BP:<span className={getVitalClass(vitals.sbp, 'sbp')}>{vitals.sbp}</span></div>
                     <div>RR:<span className={getVitalClass(vitals.rr, 'rr')}>{vitals.rr}</span></div>
-                    <div>SpO2:<span className={getVitalClass(vitals.spo2, 'spo2')}>{vitals.spo2}%</span></div>
+                    <div>SpO2:<span className={getVitalClass(vitals.spo2, 'spo2')}>{vitals.spo2}</span></div>
                 </div>
             );
         };
@@ -180,32 +180,32 @@
                     draggable
                     onDragStart={(e) => onDragStart(e, patient.uniqueId)}
                     onClick={() => onSelect(patient)}
-                    className={`p-2 rounded-md shadow-sm border border-black/5 text-sm cursor-grab active:cursor-grabbing mb-2 ${getColorClass(patient.category)} ${isSelected ? 'ring-2 ring-blue-600 ring-offset-1' : 'hover:shadow-md'} transition-all relative select-none`}
+                    className={`p-1.5 rounded shadow-sm border border-black/5 text-xs cursor-grab active:cursor-grabbing mb-1.5 ${getColorClass(patient.category)} ${isSelected ? 'ring-2 ring-blue-600 ring-offset-1' : 'hover:shadow-md'} transition-all relative select-none`}
                 >
-                    <div className="flex justify-between items-start mb-1">
-                        <div>
-                            <span className="font-bold text-gray-900 block leading-none">{patient.name}</span>
-                            <span className="text-[10px] text-gray-600">{patient.age} {patient.gender}</span>
+                    <div className="flex justify-between items-start mb-0.5">
+                        <div className="overflow-hidden">
+                            <span className="font-bold text-gray-900 block leading-none truncate">{patient.name}</span>
+                            <span className="text-[9px] text-gray-600 truncate block">{patient.age} {patient.gender}</span>
                         </div>
                         {isRevealed ? (
-                            <span className="px-1.5 py-0.5 bg-white/80 rounded text-[10px] font-black border border-black/10">{patient.category}</span>
+                            <span className="px-1 py-0 bg-white/80 rounded text-[9px] font-black border border-black/10">{patient.category}</span>
                         ) : (
-                            <span className="px-1.5 py-0.5 bg-gray-200 rounded text-[10px] font-bold text-gray-500">?</span>
+                            <span className="px-1 py-0 bg-gray-200 rounded text-[9px] font-bold text-gray-500">?</span>
                         )}
                     </div>
                     
                     {isRevealed ? (
                         <>
-                            <div className="flex gap-2 items-center">
-                                <div className="text-gray-800 text-[10px] leading-tight flex-1 line-clamp-2">{patient.text}</div>
+                            <div className="flex gap-1.5 items-center">
+                                <div className="text-gray-800 text-[9px] leading-tight flex-1 line-clamp-2 h-6">{patient.text}</div>
                             </div>
                             <VitalsDisplay vitals={patient.vitals} />
                         </>
                     ) : (
-                        <div className="text-[10px] text-gray-500 italic py-2 text-center">Awaiting Triage...</div>
+                        <div className="text-[9px] text-gray-500 italic py-1 text-center">Awaiting Triage...</div>
                     )}
 
-                    <div className="mt-1 flex justify-between items-center text-[10px] font-medium text-gray-600 border-t border-black/5 pt-1">
+                    <div className="mt-0.5 flex justify-between items-center text-[9px] font-medium text-gray-600 border-t border-black/5 pt-0.5">
                         {patient.treated ? 
                             <span className="text-emerald-700 font-bold flex items-center gap-1">✓ Stable</span> : 
                             <span className="text-amber-700 font-bold flex items-center gap-1">⚠ Unstable</span>
@@ -229,15 +229,15 @@
                     onDrop={(e) => onDrop(e, zone.id)}
                     className={`bg-white rounded-lg shadow-sm border h-full flex flex-col overflow-hidden zone-card ${isOverflow ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-200'}`}
                 >
-                    <div className={`px-3 py-2 border-b flex justify-between items-center ${zone.id === 'morgue' ? 'bg-gray-800 text-white' : 'bg-gray-50 text-gray-700'}`}>
-                        <h3 className="font-bold text-xs uppercase tracking-wide truncate">{zone.name}</h3>
-                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${isFull ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                    <div className={`px-2 py-1.5 border-b flex justify-between items-center ${zone.id === 'morgue' ? 'bg-gray-800 text-white' : 'bg-gray-50 text-gray-700'}`}>
+                        <h3 className="font-bold text-[10px] uppercase tracking-wide truncate">{zone.name}</h3>
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${isFull ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
                             {zonePatients.length}/{zone.capacity}
                         </span>
                     </div>
-                    <div className="flex-1 p-2 overflow-y-auto bg-slate-50 min-h-[120px]">
+                    <div className="flex-1 p-1.5 overflow-y-auto bg-slate-50 min-h-[100px]">
                         {zonePatients.length === 0 ? (
-                            <div className="h-full flex items-center justify-center text-gray-300 text-[10px] font-bold uppercase tracking-widest pointer-events-none">Drop Here</div>
+                            <div className="h-full flex items-center justify-center text-gray-300 text-[9px] font-bold uppercase tracking-widest pointer-events-none">Drop Here</div>
                         ) : (
                             zonePatients.map(p => (
                                 <PatientCard 
@@ -611,7 +611,7 @@
                                 Start Simulation
                             </button>
                             <div className="mt-4 text-xs text-slate-400">
-                                Version 6.3 • WMEBEM
+                                Version 6.4 • WMEBEM
                             </div>
                         </div>
                     </div>
@@ -701,20 +701,20 @@
                             <div className="flex-1 overflow-y-auto p-4 relative z-10 custom-scrollbar">
                                 <div className="grid grid-cols-4 gap-4 h-full auto-rows-min">
                                     {/* Row 1: Intake */}
-                                    <div className="col-span-2 h-[320px]"><ZoneDisplay zone={ZONES[0]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
-                                    <div className="col-span-2 h-[320px]"><ZoneDisplay zone={ZONES[1]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-1 h-[400px]"><ZoneDisplay zone={ZONES[0]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-1 h-[400px]"><ZoneDisplay zone={ZONES[1]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-2 h-[400px] flex flex-col gap-4">
+                                        <div className="flex-1"><ZoneDisplay zone={ZONES[2]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                        <div className="flex-1"><ZoneDisplay zone={ZONES[5]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    </div>
                                     
-                                    {/* Row 2: Clinical */}
-                                    <div className="col-span-1 h-[250px]"><ZoneDisplay zone={ZONES[2]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
-                                    <div className="col-span-1 h-[250px]"><ZoneDisplay zone={ZONES[3]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
-                                    <div className="col-span-2 h-[250px]"><ZoneDisplay zone={ZONES[4]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    {/* Row 2: Flow */}
+                                    <div className="col-span-1 h-[300px]"><ZoneDisplay zone={ZONES[3]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-1 h-[300px]"><ZoneDisplay zone={ZONES[4]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-1 h-[300px]"><ZoneDisplay zone={ZONES[6]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-1 h-[300px]"><ZoneDisplay zone={ZONES[7]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
 
-                                    {/* Row 3: Treatment */}
-                                    <div className="col-span-1 h-[200px]"><ZoneDisplay zone={ZONES[5]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
-                                    <div className="col-span-1 h-[200px]"><ZoneDisplay zone={ZONES[6]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
-                                    <div className="col-span-2 h-[200px]"><ZoneDisplay zone={ZONES[7]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
-
-                                    {/* Row 4: Exit */}
+                                    {/* Row 3: Exit */}
                                     <div className="col-span-2 h-[200px]"><ZoneDisplay zone={ZONES[8]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
                                     <div className="col-span-1 h-[200px]"><ZoneDisplay zone={ZONES[9]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
                                     <div className="col-span-1 h-[200px]"><ZoneDisplay zone={ZONES[10]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
