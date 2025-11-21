@@ -55,12 +55,27 @@
         
         const PHASES = ['Receipt (0-4h)', 'Definitive Care (4-12h)', 'Recovery (12-48h)'];
         
+        // --- EXPANDED ROLES (10 ROLES) ---
         const ALL_ROLES = [
-            { id: 'silver', name: 'Silver Commander', ap: 4, desc: 'Strategy & Resource', ability: 'Request Mutual Aid (+3 Staff)', abilityCost: 2 },
-            { id: 'bronze', name: 'ED Consultant', ap: 5, desc: 'Triage & Flow', ability: 'Rapid Triage (Reveal All Intake)', abilityCost: 2 },
-            { id: 'nurse', name: 'Nurse Charge', ap: 4, desc: 'Coordination', ability: 'Team Huddle (+1 AP to others)', abilityCost: 1 },
-            { id: 'resident', name: 'ED Resident', ap: 4, desc: 'Treatment', ability: 'Fast Track (Instant Treat P3)', abilityCost: 2 },
-            { id: 'theatre', name: 'Theatre Coord', ap: 3, desc: 'Surgical Flow', ability: 'Clear Theatre (Free ICU Move)', abilityCost: 1 },
+            // COMMAND (Silver/Grey)
+            { id: 'silver', type: 'command', name: 'Silver Commander', ap: 4, desc: 'Strategy & Resource', ability: 'Request Mutual Aid (+3 Staff)', abilityCost: 2, actionText: 'Review / Command' },
+            { id: 'bronze', type: 'command', name: 'ED Consultant', ap: 5, desc: 'Triage & Flow', ability: 'Rapid Triage (Reveal All Intake)', abilityCost: 2, actionText: 'Clinical Review' },
+            
+            // NURSING (Blue)
+            { id: 'nurse_ic', type: 'nursing', name: 'Nurse in Charge', ap: 4, desc: 'Coordination', ability: 'Team Huddle (+1 AP to others)', abilityCost: 1, actionText: 'Coordinate Care' },
+            { id: 'nurse_triage', type: 'nursing', name: 'Triage Nurse', ap: 4, desc: 'Assessment', ability: 'Stream to Minors (Move P3 Free)', abilityCost: 1, actionText: 'Assess / Vitals' },
+            { id: 'nurse_resus', type: 'nursing', name: 'Resus Nurse', ap: 4, desc: 'Critical Care', ability: 'IV Access (Treat P1 +1 AP)', abilityCost: 0, actionText: 'Give Meds / Obs' },
+            { id: 'nurse_majors', type: 'nursing', name: 'Majors Nurse', ap: 4, desc: 'Ward Care', ability: 'Analgesia (Treat P2 +1 AP)', abilityCost: 0, actionText: 'Give Meds / Obs' },
+            
+            // MEDICAL (Green)
+            { id: 'resident', type: 'medical', name: 'ED Resident', ap: 4, desc: 'Treatment', ability: 'Fast Track (Instant Treat P3)', abilityCost: 2, actionText: 'Perform Procedure' },
+            
+            // SUPPORT (Purple)
+            { id: 'radiology', type: 'support', name: 'Radiology Lead', ap: 3, desc: 'Diagnostics', ability: 'Rapid Scan (Move to CT Free)', abilityCost: 1, actionText: 'Perform Scan' },
+            { id: 'theatre', type: 'support', name: 'Theatre Coord', ap: 3, desc: 'Surgical Flow', ability: 'Clear Theatre (Free ICU Move)', abilityCost: 1, actionText: 'Prep Theatre' },
+            
+            // LOGISTICS (Amber)
+            { id: 'bed_manager', type: 'logistics', name: 'Bed Manager', ap: 3, desc: 'Flow', ability: 'Force Discharge (Clear Ward Bed)', abilityCost: 1, actionText: 'Breach Protocol' }
         ];
 
         const ZONES = [
@@ -308,29 +323,24 @@
                 </div>
 
                 <div>
-                    <h4 className="font-bold text-blue-800 mb-1">2. Command Roles</h4>
+                    <h4 className="font-bold text-blue-800 mb-1">2. Key Roles (Expanded)</h4>
                     <ul className="space-y-2 text-xs">
-                        <li className="bg-slate-50 p-2 rounded">
-                            <span className="font-bold block">Silver Commander (4 AP)</span>
-                            Use *Request Mutual Aid* to get more Staff.
+                        <li className="bg-slate-50 p-2 rounded border-l-4 border-gray-400">
+                            <span className="font-bold block text-gray-800">Command (Silver/Bronze)</span>
+                            Strategic oversight & Triage.
                         </li>
-                        <li className="bg-slate-50 p-2 rounded">
-                            <span className="font-bold block">Bronze Consultant (5 AP)</span>
-                            Use *Rapid Triage* to reveal all incoming patients at once.
+                        <li className="bg-blue-50 p-2 rounded border-l-4 border-blue-600">
+                            <span className="font-bold block text-blue-800">Nursing Team</span>
+                            Coordinate (Huddle), Assessment (Stream P3), & Care (Meds/Obs).
                         </li>
-                        <li className="bg-slate-50 p-2 rounded">
-                            <span className="font-bold block">Nurse Charge (4 AP)</span>
-                            Use *Huddle* to restore AP to the team.
+                        <li className="bg-emerald-50 p-2 rounded border-l-4 border-emerald-500">
+                            <span className="font-bold block text-emerald-800">Medical Team</span>
+                            Procedures, Prescribing & Fast Tracking.
                         </li>
-                    </ul>
-                </div>
-                
-                <div>
-                    <h4 className="font-bold text-blue-800 mb-1">3. Mechanics</h4>
-                    <ul className="list-disc pl-5 space-y-1 text-xs">
-                        <li>**Drag & Drop:** Move patients to zones.</li>
-                        <li>**Resources:** ICU needs Vents. Resus needs Staff. P1 treatment needs Blood.</li>
-                        <li>**Scoring:** +Points for Discharging stable patients. -Points for Deaths.</li>
+                         <li className="bg-purple-50 p-2 rounded border-l-4 border-purple-500">
+                            <span className="font-bold block text-purple-800">Support (Rad/Theatre)</span>
+                            Rapid Diagnostics & Surgical logistics.
+                        </li>
                     </ul>
                 </div>
             </div>
@@ -368,12 +378,24 @@
             const [resources, setResources] = useState({ staff: 15, blood: 20, vents: 8 });
             
             const [eventLog, setEventLog] = useState([]);
-            const [modalContent, setModalContent] = useState(null); // 'sitrep', 'event', 'guide', null
+            const [modalContent, setModalContent] = useState(null);
 
             const currentRole = roleStates.find(r => r.id === currentRoleId);
             const selectedPatient = patients.find(p => p.uniqueId === selectedPatientId);
 
             const addLog = (msg) => setEventLog(prev => [`T${turn}: ${msg}`, ...prev]);
+
+            // --- ROLE HELPER ---
+            const getRoleStyle = (type, isSelected) => {
+                let base = "";
+                if (type === 'command') base = isSelected ? "bg-slate-200 border-slate-600 text-slate-900" : "hover:bg-slate-50 border-transparent text-slate-700";
+                if (type === 'nursing') base = isSelected ? "bg-blue-100 border-blue-600 text-blue-900" : "hover:bg-blue-50 border-transparent text-blue-800";
+                if (type === 'medical') base = isSelected ? "bg-emerald-100 border-emerald-600 text-emerald-900" : "hover:bg-emerald-50 border-transparent text-emerald-800";
+                if (type === 'support') base = isSelected ? "bg-purple-100 border-purple-600 text-purple-900" : "hover:bg-purple-50 border-transparent text-purple-800";
+                if (type === 'logistics') base = isSelected ? "bg-amber-100 border-amber-600 text-amber-900" : "hover:bg-amber-50 border-transparent text-amber-800";
+                
+                return `${base} border-l-4`;
+            };
 
             // --- ACTIONS ---
 
@@ -419,10 +441,11 @@
                 setRoleStates(prev => prev.map(r => r.id === currentRoleId ? { ...r, currentAp: r.currentAp - 1 } : r));
                 
                 let updates = { location: targetZoneId };
-                if (targetZoneId === 'triage' || targetZoneId === 'resus' || targetZoneId === 'majors') {
+                // Triage Logic
+                if (['triage', 'resus', 'majors'].includes(targetZoneId)) {
                     if (!patient.triaged) {
                         updates.triaged = true;
-                        addLog(`Triaged ${patient.name}: ${patient.category}`);
+                        addLog(`${currentRole.name} Triaged ${patient.name}: ${patient.category}`);
                     }
                 }
                 
@@ -460,7 +483,7 @@
                 }
                 
                 setScore(s => s + 10);
-                addLog(`${currentRole.name} stabilised ${selectedPatient.name}.`);
+                addLog(`${currentRole.name}: ${currentRole.actionText} on ${selectedPatient.name}.`);
             };
 
             const useSpecialAbility = () => {
@@ -472,7 +495,14 @@
                 switch(currentRole.id) {
                     case 'silver': setResources(prev => ({ ...prev, staff: prev.staff + 3 })); break;
                     case 'bronze': setPatients(prev => prev.map(p => p.location === 'amb' ? { ...p, triaged: true } : p)); break;
-                    case 'nurse': setRoleStates(prev => prev.map(r => r.id !== 'nurse' ? { ...r, currentAp: Math.min(r.ap, r.currentAp + 1) } : r)); break;
+                    case 'nurse_ic': setRoleStates(prev => prev.map(r => r.id !== 'nurse_ic' ? { ...r, currentAp: Math.min(r.ap, r.currentAp + 1) } : r)); break;
+                    case 'nurse_triage': 
+                        const p3Untriaged = patients.find(p => p.location === 'amb' && p.category === 'P3' && !p.triaged);
+                        if(p3Untriaged) {
+                            setPatients(prev => prev.map(p => p.uniqueId === p3Untriaged.uniqueId ? { ...p, location: 'minors', triaged: true } : p));
+                            addLog(`Streamed ${p3Untriaged.name} to Minors`);
+                        }
+                        break;
                     case 'resident': 
                         const p3 = patients.find(p => p.location === 'minors' && !p.treated && p.category === 'P3');
                         if (p3) {
@@ -480,10 +510,21 @@
                             addLog(`Fast Tracked ${p3.name}`);
                         }
                         break;
+                    case 'radiology':
+                        const needCT = patients.find(p => (p.location === 'resus' || p.location === 'majors') && !p.treated);
+                        if(needCT) {
+                             setPatients(prev => prev.map(p => p.uniqueId === needCT.uniqueId ? { ...p, location: 'ct' } : p));
+                             addLog(`Rapid Scan for ${needCT.name}`);
+                        }
+                        break;
                     case 'theatre':
                         const surg = patients.find(p => p.location === 'theatre' && p.treated);
                         if (surg) setPatients(prev => prev.map(p => p.uniqueId === surg.uniqueId ? { ...p, location: 'icu' } : p));
                         break;
+                    case 'bed_manager':
+                         setScore(s => s - 5); // penalty for forcing discharge
+                         addLog("Forced Discharge executed. Bed cleared.");
+                         break;
                 }
             };
 
@@ -493,7 +534,6 @@
                 setRoleStates(prev => prev.map(r => ({ ...r, currentAp: r.ap })));
 
                 if (Math.random() > 0.6) {
-                    // Logic to show event modal could go here, for now simple logic
                     addLog(`Turn ${turn + 1} Started.`);
                 }
 
@@ -517,11 +557,15 @@
             };
             
             const getRoleSuggestion = (count) => {
-                if(count === 1) return "You are the Incident Commander (Solo Mode).";
-                if(count === 2) return "P1: Silver (Strategy) + Bronze (Triage) | P2: Nurse + Resident + Theatre (Treatment)";
-                if(count === 3) return "P1: Silver | P2: Bronze + Resident | P3: Nurse + Theatre";
-                if(count === 4) return "P1: Silver | P2: Bronze | P3: Resident | P4: Nurse + Theatre";
-                return "Distribute roles evenly among 5 players.";
+                if(count === 1) return "Solo Mode: You control all Command, Nursing, Medical, and Support roles.";
+                if(count === 2) return "P1: Command + Medical | P2: Nursing + Support";
+                if(count === 3) return "P1: Command | P2: Nursing | P3: Medical + Support";
+                if(count === 4) return "P1: Command | P2: Nursing | P3: Medical | P4: Support";
+                if(count === 5) return "P1: Silver | P2: Bronze | P3: Nursing Lead | P4: Medical | P5: Support";
+                if(count === 6) return "Command(2) | Nursing(2) | Medical(1) | Support(1)";
+                if(count === 7) return "Command(2) | Nursing(2) | Medical(2) | Support(1)";
+                if(count === 8) return "Distribute the 10 roles evenly. (e.g. 2 roles per player pair, or specialized).";
+                return "";
             };
 
             // --- RENDERERS ---
@@ -536,12 +580,12 @@
                             
                             <div className="mb-8">
                                 <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Select Team Size</label>
-                                <div className="flex justify-center gap-2 mb-4">
-                                    {[1, 2, 3, 4, 5].map(num => (
+                                <div className="flex flex-wrap justify-center gap-2 mb-4">
+                                    {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
                                         <button 
                                             key={num}
                                             onClick={() => setPlayerCount(num)}
-                                            className={`w-12 h-12 rounded-xl font-bold text-lg transition-all ${playerCount === num ? 'bg-blue-600 text-white scale-110 shadow-lg' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                                            className={`w-10 h-10 rounded-xl font-bold text-lg transition-all ${playerCount === num ? 'bg-blue-600 text-white scale-110 shadow-lg' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
                                         >
                                             {num}
                                         </button>
@@ -558,7 +602,7 @@
                                 Start Simulation
                             </button>
                             <div className="mt-4 text-xs text-slate-400">
-                                Version 5.1 • WMEBEM
+                                Version 6.1 • WMEBEM
                             </div>
                         </div>
                     </div>
@@ -597,28 +641,42 @@
                         {/* LEFT: ROLES */}
                         <div className="w-72 flex flex-col gap-3 shrink-0">
                             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col min-h-0">
-                                <div className="bg-slate-50 px-4 py-3 border-b border-gray-100"><h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Command Team</h3></div>
-                                <div className="overflow-y-auto flex-1">
+                                <div className="bg-slate-50 px-4 py-3 border-b border-gray-100 flex justify-between">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Command Staff</h3>
+                                    <span className="text-[10px] text-gray-400 font-bold">{ALL_ROLES.length} Active</span>
+                                </div>
+                                <div className="overflow-y-auto flex-1 p-2 space-y-2">
                                     {roleStates.map(role => (
-                                        <button key={role.id} onClick={() => { setCurrentRoleId(role.id); setSelectedPatientId(null); }} className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors flex justify-between items-center group ${currentRoleId === role.id ? 'bg-blue-50/50 border-l-4 border-l-blue-600' : 'border-l-4 border-l-transparent'}`}>
-                                            <div><div className={`font-bold text-sm ${currentRoleId === role.id ? 'text-blue-900' : 'text-gray-700'}`}>{role.name}</div><div className="text-[10px] text-gray-400 leading-tight">{role.desc}</div></div>
-                                            <div className={`text-sm font-black w-8 h-8 rounded-full flex items-center justify-center ${role.currentAp > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'}`}>{role.currentAp}</div>
+                                        <button 
+                                            key={role.id} 
+                                            onClick={() => { setCurrentRoleId(role.id); setSelectedPatientId(null); }} 
+                                            className={`w-full text-left px-3 py-2 rounded transition-all flex justify-between items-center group shadow-sm ${getRoleStyle(role.type, currentRoleId === role.id)}`}
+                                        >
+                                            <div className="overflow-hidden">
+                                                <div className="font-bold text-xs truncate">{role.name}</div>
+                                                <div className="text-[10px] opacity-70 leading-tight truncate">{role.desc}</div>
+                                            </div>
+                                            <div className={`text-[10px] font-black w-6 h-6 rounded flex items-center justify-center shrink-0 ml-2 ${role.currentAp > 0 ? 'bg-white/50 text-current' : 'bg-gray-200 text-gray-400'}`}>
+                                                {role.currentAp}
+                                            </div>
                                         </button>
                                     ))}
                                 </div>
                             </div>
+                            
                             {/* ACTION PANEL */}
                             <div className="bg-white rounded-xl shadow-md border border-blue-100 p-4 shrink-0">
                                 <h3 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-3">Active: {currentRole?.name}</h3>
                                 <div className="grid gap-2">
                                     <button onClick={handleTreat} disabled={!selectedPatient || selectedPatient.treated || currentRole.currentAp < 1} className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded font-bold text-sm transition-colors flex items-center justify-center gap-2">
-                                        Treat Patient (1 AP)
+                                        {currentRole?.actionText} (1 AP)
                                     </button>
                                     <button onClick={useSpecialAbility} disabled={currentRole.currentAp < currentRole.abilityCost} className="w-full py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded font-bold text-sm transition-colors flex items-center justify-center gap-2">
                                         {currentRole.ability} ({currentRole.abilityCost} AP)
                                     </button>
                                 </div>
                             </div>
+                            
                             {/* RESOURCES */}
                             <div className="bg-slate-800 rounded-xl p-4 text-white shrink-0">
                                 <div className="grid grid-cols-3 gap-2 text-center">
