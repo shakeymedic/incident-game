@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>INCIDENT Command: UK Major Incident Sim</title>
+    <title>WMEBEM Incident Command</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React and ReactDOM -->
@@ -15,331 +15,214 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; user-select: none; }
         .zone-card { transition: all 0.2s; }
-        .zone-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .zone-card.drag-over { background-color: #f0f9ff; border-color: #0284c7; box-shadow: 0 0 0 2px #0284c7 inset; }
         
-        /* Clinical Triage Colors - NHS Standard */
+        /* NHS / WMEBEM Standard Colours */
         .p1-bg { background-color: #fecaca; border-left: 6px solid #dc2626; } /* Red - Immediate */
         .p2-bg { background-color: #fef3c7; border-left: 6px solid #d97706; } /* Yellow - Urgent */
         .p3-bg { background-color: #d1fae5; border-left: 6px solid #059669; } /* Green - Delayed */
-        .dead-bg { background-color: #e5e7eb; border-left: 6px solid #1f2937; } /* Black/Grey - Expectant/Dead */
+        .dead-bg { background-color: #e2e8f0; border-left: 6px solid #1e293b; } /* Black/Grey - Expectant/Dead */
         
-        .vital-red { color: #dc2626; font-weight: bold; }
+        .vital-red { color: #dc2626; font-weight: 900; animation: pulse 2s infinite; }
         .vital-amber { color: #d97706; font-weight: bold; }
         .vital-normal { color: #059669; }
 
-        /* SVG Stick Figure Styles */
-        .stick-fig-path { fill: none; stroke: #1e293b; stroke-width: 2.5; stroke-linecap: round; }
-        .injury-x { stroke: #dc2626; stroke-width: 4; stroke-linecap: round; }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .logo-h { height: 3.5rem; width: auto; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
 
-        // --- GAME DATA & CONSTANTS ---
-
+        // --- GAME CONSTANTS ---
+        const LOGO_URL = "https://iili.io/KGQOvkl.md.png";
+        
         const PHASES = ['Receipt (0-4h)', 'Definitive Care (4-12h)', 'Recovery (12-48h)'];
         
         const ALL_ROLES = [
-            { id: 'silver', name: 'Hospital Silver', ap: 4, desc: 'Tactical Command, SITREPs, Mutual Aid' },
-            { id: 'bronze', name: 'ED Consultant (Bronze)', ap: 5, desc: 'ED Control, Priorities, Staff Allocation' },
-            { id: 'triage', name: 'Triage Officer', ap: 5, desc: 'TST/MITT Application, Streaming' },
-            { id: 'resident', name: 'ED Resident', ap: 4, desc: 'Assessments, Procedures, Prescribing' },
-            { id: 'nurse', name: 'ED Nurse Lead', ap: 4, desc: 'Care delivery, Monitoring, Transfers' },
-            { id: 'theatre', name: 'Theatre Coord', ap: 4, desc: 'Surgical List, Emergency Theatre' },
-            { id: 'icu', name: 'ICU Coord', ap: 4, desc: 'Critical Care Beds, Vents' },
-            { id: 'radio', name: 'Radiology Lead', ap: 3, desc: 'CT/X-Ray Flow' }
+            { id: 'silver', name: 'Silver Commander', ap: 4, desc: 'Strategy & Resource', ability: 'Request Mutual Aid (+3 Staff)', abilityCost: 2 },
+            { id: 'bronze', name: 'ED Consultant', ap: 5, desc: 'Triage & Flow', ability: 'Rapid Triage (Reveal All Intake)', abilityCost: 2 },
+            { id: 'nurse', name: 'Nurse Charge', ap: 4, desc: 'Coordination', ability: 'Team Huddle (+1 AP to others)', abilityCost: 1 },
+            { id: 'resident', name: 'ED Resident', ap: 4, desc: 'Treatment', ability: 'Fast Track (Instant Treat P3)', abilityCost: 2 },
+            { id: 'theatre', name: 'Theatre Coord', ap: 3, desc: 'Surgical Flow', ability: 'Clear Theatre (Free ICU Move)', abilityCost: 1 },
         ];
 
         const ZONES = [
-            { id: 'amb', name: 'Ambulance Bay', capacity: 6, type: 'intake' },
+            { id: 'amb', name: 'Ambulance Bay', capacity: 8, type: 'intake' },
             { id: 'triage', name: 'Triage Lane', capacity: 10, type: 'process' },
-            { id: 'resus', name: 'Resus (P1)', capacity: 6, type: 'clinical' },
-            { id: 'majors', name: 'Majors (P2)', capacity: 12, type: 'clinical' },
+            { id: 'resus', name: 'Resus (P1)', capacity: 4, type: 'clinical' },
+            { id: 'majors', name: 'Majors (P2)', capacity: 10, type: 'clinical' },
             { id: 'minors', name: 'Minors (P3)', capacity: 15, type: 'clinical' },
             { id: 'ct', name: 'CT Scanner', capacity: 1, type: 'diagnostic' },
-            { id: 'theatre', name: 'Theatres', capacity: 3, type: 'treatment' },
-            { id: 'icu', name: 'ICU/HDU', capacity: 8, type: 'ward' },
-            { id: 'ward', name: 'Wards', capacity: 50, type: 'ward' },
+            { id: 'theatre', name: 'Theatres', capacity: 2, type: 'treatment' },
+            { id: 'icu', name: 'ICU/HDU', capacity: 6, type: 'ward' },
+            { id: 'ward', name: 'Wards', capacity: 30, type: 'ward' },
+            { id: 'morgue', name: 'Mortuary', capacity: 999, type: 'exit' },
             { id: 'discharged', name: 'Discharged', capacity: 999, type: 'exit' }
         ];
 
+        // --- PATIENT DATA GENERATORS ---
         const NAMES = ["Smith", "Jones", "Taylor", "Brown", "Williams", "Wilson", "Johnson", "Davies", "Robinson", "Wright", "Thompson", "Evans", "Walker", "White", "Roberts", "Green", "Hall", "Wood", "Harris", "Martin"];
         const FIRST_NAMES = ["James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph", "Thomas", "Charles", "Mary", "Patricia", "Jennifer", "Linda", "Elizabeth", "Barbara", "Susan", "Jessica", "Sarah", "Karen"];
 
         const generateIdentity = () => {
             const first = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
             const last = NAMES[Math.floor(Math.random() * NAMES.length)];
-            // Weighted age generation
             const r = Math.random();
             let age;
-            if (r < 0.1) age = Math.floor(Math.random() * 12) + "y"; // 10% Kids
-            else if (r < 0.8) age = Math.floor(Math.random() * 50) + 18 + "y"; // 70% Adults
-            else age = Math.floor(Math.random() * 20) + 70 + "y"; // 20% Elderly
+            if (r < 0.15) age = Math.floor(Math.random() * 12) + "y"; 
+            else if (r < 0.75) age = Math.floor(Math.random() * 50) + 18 + "y"; 
+            else age = Math.floor(Math.random() * 20) + 70 + "y"; 
             
             const gender = Math.random() > 0.5 ? "M" : "F";
             return { name: `${first} ${last}`, age, gender };
         };
 
-        // Updated Patient Deck with Clinical Vitals & Demographics
         const PATIENT_DECK = [
-            { id: 'P1-001', category: 'P1', injuryLoc: 'chest', text: 'GSW Chest. <C>ABC issue. Needs: MTP activation, Chest Drain, Thoracotomy.', timer: 1, vitals: { hr: 140, sbp: 70, rr: 32, gcs: 14, spo2: 88 } },
-            { id: 'P1-002', category: 'P1', injuryLoc: 'abdo', text: 'Blast Abdomen. Rigid, Distended. Peritonitis. Needs: Damage Control Surgery.', timer: 1, vitals: { hr: 130, sbp: 85, rr: 24, gcs: 15, spo2: 94 } },
-            { id: 'P1-003', category: 'P1', injuryLoc: 'chest', text: 'Open Thoracic Wound. Sucking. Needs: 3-sided seal, Drain, Theatre.', timer: 1, vitals: { hr: 120, sbp: 90, rr: 30, gcs: 14, spo2: 90 } },
-            { id: 'P1-004', category: 'P1', injuryLoc: 'leg', text: 'Crush Injury >4h. Dark urine. Hyperkalaemia. Needs: Fluids, Calcium/Insulin/Dex, ICU.', timer: 1, vitals: { hr: 110, sbp: 100, rr: 20, gcs: 15, spo2: 96 } },
-            { id: 'P1-005', category: 'P1', injuryLoc: 'abdo', text: 'Impaled Object Abdomen. Unstable. Needs: Theatre removal (do not remove in ED).', timer: 1, vitals: { hr: 135, sbp: 80, rr: 22, gcs: 15, spo2: 95 } },
-            { id: 'P1-006', category: 'P1', injuryLoc: 'leg', text: 'Traumatic Amputation. Tourniquet on. Needs: MTP, Theatre.', timer: 1, vitals: { hr: 125, sbp: 95, rr: 24, gcs: 13, spo2: 92 } },
-            
-            { id: 'P2-001', category: 'P2', injuryLoc: 'abdo', text: 'Stable Penetrating Abdomen. FAST positive. Needs: CT Abdo/Pelvis, Obs.', timer: 3, vitals: { hr: 95, sbp: 110, rr: 18, gcs: 15, spo2: 98 } },
-            { id: 'P2-002', category: 'P2', injuryLoc: 'abdo', text: 'Pelvic #. Binder applied. Stable. Needs: CT, Ortho review.', timer: 3, vitals: { hr: 100, sbp: 105, rr: 20, gcs: 15, spo2: 97 } },
-            { id: 'P2-003', category: 'P2', injuryLoc: 'head', text: 'TBI. Pupillary asymmetry. Needs: Urgent CT Head, Neuroprotective.', timer: 2, vitals: { hr: 60, sbp: 160, rr: 12, gcs: 10, spo2: 96 } },
-            { id: 'P2-004', category: 'P2', injuryLoc: 'leg', text: 'Complex Open Tib/Fib. Pulses intact. Needs: Abx, Tetanus, Washout.', timer: 4, vitals: { hr: 90, sbp: 130, rr: 16, gcs: 15, spo2: 99 } },
-            
-            { id: 'P3-001', category: 'P3', injuryLoc: 'arm', text: 'Laceration Arm. Bleeding controlled. Needs: Washout, Suture.', timer: 6, vitals: { hr: 80, sbp: 120, rr: 14, gcs: 15, spo2: 99 } },
-            { id: 'P3-002', category: 'P3', injuryLoc: 'head', text: 'Closed Head Injury. Needs: NICE head injury observation.', timer: 6, vitals: { hr: 76, sbp: 118, rr: 14, gcs: 15, spo2: 100 } },
-            { id: 'P3-003', category: 'P3', injuryLoc: 'leg', text: 'Ankle Injury. Cannot weight bear. Needs: Ottawa rules -> X-Ray.', timer: 6, vitals: { hr: 82, sbp: 124, rr: 16, gcs: 15, spo2: 98 } },
-            
-            { id: 'CBRN-01', category: 'P1', injuryLoc: 'head', text: 'Suspected Nerve Agent. Pinpoint pupils. Needs: DECON first, then Atropine.', timer: 1, vitals: { hr: 45, sbp: 90, rr: 30, gcs: 9, spo2: 85 } }
+            { id: 'P1-001', category: 'P1', injuryLoc: 'chest', text: 'GSW Chest. <C>ABC issue. Needs: Chest Drain, Thoracotomy.', vitals: { hr: 140, sbp: 70, rr: 32, gcs: 14, spo2: 88 } },
+            { id: 'P1-002', category: 'P1', injuryLoc: 'abdo', text: 'Blast Abdomen. Rigid. Needs: Damage Control Surgery.', vitals: { hr: 130, sbp: 85, rr: 24, gcs: 15, spo2: 94 } },
+            { id: 'P1-003', category: 'P1', injuryLoc: 'chest', text: 'Open Thoracic Wound. Sucking. Needs: Seal, Drain.', vitals: { hr: 120, sbp: 90, rr: 30, gcs: 14, spo2: 90 } },
+            { id: 'P1-004', category: 'P1', injuryLoc: 'leg', text: 'Crush Injury >4h. Hyperkalaemia. Needs: ICU.', vitals: { hr: 110, sbp: 100, rr: 20, gcs: 15, spo2: 96 } },
+            { id: 'P2-001', category: 'P2', injuryLoc: 'abdo', text: 'Stable Penetrating Abdomen. FAST positive.', vitals: { hr: 95, sbp: 110, rr: 18, gcs: 15, spo2: 98 } },
+            { id: 'P2-002', category: 'P2', injuryLoc: 'abdo', text: 'Pelvic #. Binder applied. Stable.', vitals: { hr: 100, sbp: 105, rr: 20, gcs: 15, spo2: 97 } },
+            { id: 'P2-003', category: 'P2', injuryLoc: 'head', text: 'TBI. Pupillary asymmetry. Needs: Urgent CT.', vitals: { hr: 60, sbp: 160, rr: 12, gcs: 10, spo2: 96 } },
+            { id: 'P3-001', category: 'P3', injuryLoc: 'arm', text: 'Laceration Arm. Controlled. Needs: Suture.', vitals: { hr: 80, sbp: 120, rr: 14, gcs: 15, spo2: 99 } },
+            { id: 'P3-002', category: 'P3', injuryLoc: 'head', text: 'Closed Head Injury. Needs: Obs.', vitals: { hr: 76, sbp: 118, rr: 14, gcs: 15, spo2: 100 } },
+            { id: 'CBRN-01', category: 'P1', injuryLoc: 'head', text: 'Nerve Agent. Pinpoint pupils. Needs: DECON, Atropine.', vitals: { hr: 45, sbp: 90, rr: 30, gcs: 9, spo2: 85 } }
         ];
 
         const EVENTS = [
-            { title: "Major Incident Declared", effect: "Activate Hospital Major Incident Plan. Clear ED." },
-            { title: "Second Wave Early", effect: "Add 3 patients immediately to Ambulance Bay." },
-            { title: "CT Scanner Failure", effect: "CT Capacity 0 for this turn. Use clinical judgement or ultrasound." },
-            { title: "Mutual Aid Arrives", effect: "Gain 2 extra Nurse AP this turn." },
-            { title: "Media at Entrance", effect: "Silver loses 2 AP managing press inquiries." },
-            { title: "Blood Bank Shortage", effect: "MTP costs double AP. Conserve O-Negative." }
+            { title: "Major Incident Declared", effect: "Activate Plan. Clear ED." },
+            { title: "Second Wave", effect: "Add 4 patients to Ambulance Bay." },
+            { title: "CT Failure", effect: "CT Capacity 0 for this turn." },
+            { title: "Mutual Aid", effect: "Gain 5 Staff Resources." },
+            { title: "Blood Shortage", effect: "Blood Resources halved." }
         ];
 
         // --- COMPONENTS ---
 
-        // Enhanced SVG Stick Figure with Correct Coordinates
-        const StickFigure = ({ injuryLoc }) => {
-            // Coordinate system: 0,0 to 100,100
-            return (
-                <svg width="60" height="100" viewBox="0 0 100 100" className="overflow-visible">
-                    {/* Head */}
-                    <circle cx="50" cy="15" r="12" className="stick-fig-path" />
-                    {/* Body */}
-                    <line x1="50" y1="27" x2="50" y2="60" className="stick-fig-path" />
-                    {/* Arms */}
-                    <line x1="50" y1="35" x2="20" y2="50" className="stick-fig-path" />
-                    <line x1="50" y1="35" x2="80" y2="50" className="stick-fig-path" />
-                    {/* Legs */}
-                    <line x1="50" y1="60" x2="30" y2="95" className="stick-fig-path" />
-                    <line x1="50" y1="60" x2="70" y2="95" className="stick-fig-path" />
-
-                    {/* Injury Markers - Fixed Positions */}
-                    {injuryLoc === 'head' && (
-                        <g className="injury-x">
-                            <line x1="40" y1="5" x2="60" y2="25" />
-                            <line x1="60" y1="5" x2="40" y2="25" />
-                        </g>
-                    )}
-                    {injuryLoc === 'chest' && (
-                        <g className="injury-x">
-                            <line x1="40" y1="30" x2="60" y2="50" />
-                            <line x1="60" y1="30" x2="40" y2="50" />
-                        </g>
-                    )}
-                    {injuryLoc === 'abdo' && (
-                        <g className="injury-x">
-                            <line x1="40" y1="50" x2="60" y2="70" />
-                            <line x1="60" y1="50" x2="40" y2="70" />
-                        </g>
-                    )}
-                    {injuryLoc === 'arm' && (
-                        <g className="injury-x">
-                            <line x1="10" y1="35" x2="30" y2="55" />
-                            <line x1="30" y1="35" x2="10" y2="55" />
-                        </g>
-                    )}
-                    {injuryLoc === 'leg' && (
-                        <g className="injury-x">
-                            <line x1="20" y1="70" x2="40" y2="90" />
-                            <line x1="40" y1="70" x2="20" y2="90" />
-                        </g>
-                    )}
-                </svg>
-            );
-        };
+        const StickFigure = ({ injuryLoc }) => (
+            <svg width="40" height="70" viewBox="0 0 100 100" className="overflow-visible opacity-90">
+                <circle cx="50" cy="15" r="12" fill="none" stroke="currentColor" strokeWidth="4" />
+                <line x1="50" y1="27" x2="50" y2="60" stroke="currentColor" strokeWidth="4" />
+                <line x1="50" y1="35" x2="20" y2="50" stroke="currentColor" strokeWidth="4" />
+                <line x1="50" y1="35" x2="80" y2="50" stroke="currentColor" strokeWidth="4" />
+                <line x1="50" y1="60" x2="30" y2="95" stroke="currentColor" strokeWidth="4" />
+                <line x1="50" y1="60" x2="70" y2="95" stroke="currentColor" strokeWidth="4" />
+                {injuryLoc === 'head' && <circle cx="50" cy="15" r="15" stroke="red" strokeWidth="3" fill="none" className="animate-pulse" />}
+                {injuryLoc === 'chest' && <circle cx="50" cy="40" r="12" stroke="red" strokeWidth="3" fill="none" className="animate-pulse" />}
+                {injuryLoc === 'abdo' && <circle cx="50" cy="55" r="10" stroke="red" strokeWidth="3" fill="none" className="animate-pulse" />}
+                {injuryLoc === 'arm' && <circle cx="20" cy="50" r="8" stroke="red" strokeWidth="3" fill="none" className="animate-pulse" />}
+                {injuryLoc === 'leg' && <circle cx="30" cy="90" r="8" stroke="red" strokeWidth="3" fill="none" className="animate-pulse" />}
+            </svg>
+        );
 
         const VitalsDisplay = ({ vitals }) => {
-            if (!vitals) return null;
-            
             const getVitalClass = (val, type) => {
                 if (type === 'hr') return (val > 120 || val < 50) ? 'vital-red' : (val > 100 ? 'vital-amber' : 'vital-normal');
                 if (type === 'sbp') return (val < 90) ? 'vital-red' : (val < 100 ? 'vital-amber' : 'vital-normal');
                 if (type === 'rr') return (val > 30 || val < 10) ? 'vital-red' : (val > 22 ? 'vital-amber' : 'vital-normal');
-                if (type === 'gcs') return (val < 9) ? 'vital-red' : (val < 14 ? 'vital-amber' : 'vital-normal');
                 return 'text-gray-600';
             };
-
             return (
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mt-2 bg-slate-50 p-2 rounded border border-slate-100">
-                    <div>HR: <span className={getVitalClass(vitals.hr, 'hr')}>{vitals.hr}</span></div>
-                    <div>BP: <span className={getVitalClass(vitals.sbp, 'sbp')}>{vitals.sbp}</span></div>
-                    <div>RR: <span className={getVitalClass(vitals.rr, 'rr')}>{vitals.rr}</span></div>
-                    <div>GCS: <span className={getVitalClass(vitals.gcs, 'gcs')}>{vitals.gcs}</span></div>
-                    <div className="col-span-2">SpO2: <span className={getVitalClass(vitals.spo2, 'spo2')}>{vitals.spo2}%</span></div>
+                <div className="grid grid-cols-2 gap-x-2 text-[10px] font-mono mt-1 bg-white/50 p-1 rounded">
+                    <div>HR:<span className={getVitalClass(vitals.hr, 'hr')}>{vitals.hr}</span></div>
+                    <div>BP:<span className={getVitalClass(vitals.sbp, 'sbp')}>{vitals.sbp}</span></div>
+                    <div>RR:<span className={getVitalClass(vitals.rr, 'rr')}>{vitals.rr}</span></div>
+                    <div>SpO2:<span className={getVitalClass(vitals.spo2, 'spo2')}>{vitals.spo2}%</span></div>
                 </div>
             );
         };
 
-        const ResourceMonitor = ({ resources }) => (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4 overflow-hidden">
-                <div className="bg-slate-50 px-4 py-2 border-b border-gray-200">
-                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Critical Resources</h3>
-                </div>
-                <div className="p-3 grid grid-cols-3 gap-2 text-center">
-                    <div className="bg-blue-50 rounded p-2 border border-blue-100">
-                        <div className="text-xs text-blue-600 font-bold uppercase">Staff</div>
-                        <div className="text-lg font-black text-blue-800">{resources.staff}</div>
-                    </div>
-                    <div className="bg-red-50 rounded p-2 border border-red-100">
-                        <div className="text-xs text-red-600 font-bold uppercase">Blood</div>
-                        <div className="text-lg font-black text-red-800">{resources.blood}</div>
-                    </div>
-                    <div className="bg-green-50 rounded p-2 border border-green-100">
-                        <div className="text-xs text-green-600 font-bold uppercase">Vents</div>
-                        <div className="text-lg font-black text-green-800">{resources.vents}</div>
-                    </div>
-                </div>
-            </div>
-        );
-
-        const Modal = ({ title, children, onClose, actions }) => (
-            <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border-t-8 border-blue-800">
-                    <div className="p-6 border-b border-gray-100">
-                        <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
-                    </div>
-                    <div className="p-6">
-                        {children}
-                    </div>
-                    <div className="p-6 border-t border-gray-100 flex justify-end space-x-3 bg-gray-50 rounded-b-lg">
-                        {actions}
-                    </div>
-                </div>
-            </div>
-        );
-
-        const StartScreen = ({ onStart }) => {
-            const [playerCount, setPlayerCount] = useState(1);
-
-            return (
-                <div className="fixed inset-0 bg-slate-900 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full text-center">
-                        <img src="https://iili.io/KGQOvkl.md.png" alt="WMEBEM Logo" className="h-24 mx-auto mb-6" />
-                        <h1 className="text-3xl font-black text-gray-900 mb-2">INCIDENT<span className="text-blue-600">COMMAND</span></h1>
-                        <p className="text-gray-500 mb-8">UK Major Incident Digital Simulation</p>
-                        
-                        <div className="mb-8">
-                            <label className="block text-sm font-bold text-gray-700 mb-2">Number of Players</label>
-                            <div className="flex justify-center gap-2">
-                                {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
-                                    <button 
-                                        key={num}
-                                        onClick={() => setPlayerCount(num)}
-                                        className={`w-10 h-10 rounded-full font-bold transition-all ${playerCount === num ? 'bg-blue-600 text-white scale-110' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                                    >
-                                        {num}
-                                    </button>
-                                ))}
-                            </div>
-                            <p className="text-sm text-gray-500 mt-2">
-                                {playerCount === 1 ? "Solo Mode: You control all roles." : `${playerCount} Players: Roles will be distributed.`}
-                            </p>
-                        </div>
-
-                        <button 
-                            onClick={() => onStart(playerCount)}
-                            className="w-full bg-blue-700 hover:bg-blue-800 text-white text-lg font-bold py-4 rounded-lg shadow-lg transition-transform transform hover:scale-105"
-                        >
-                            START SIMULATION
-                        </button>
-                    </div>
-                </div>
-            );
-        };
-
-        const PatientCard = ({ patient, onSelect, isSelected, showDetail }) => {
+        const PatientCard = ({ patient, onSelect, isSelected, onDragStart }) => {
             const getColorClass = (cat) => {
                 if(cat === 'P1') return "p1-bg";
                 if(cat === 'P2') return "p2-bg";
                 if(cat === 'P3') return "p3-bg";
                 return "dead-bg";
             };
-            const colorClass = getColorClass(patient.category);
+            
+            const isRevealed = patient.location !== 'amb' || patient.triaged;
 
             return (
                 <div 
+                    draggable
+                    onDragStart={(e) => onDragStart(e, patient.uniqueId)}
                     onClick={() => onSelect(patient)}
-                    className={`p-3 rounded-md shadow-sm text-sm cursor-pointer mb-2 ${colorClass} ${isSelected ? 'ring-2 ring-blue-600 scale-[1.02]' : 'hover:shadow-md'} transition-all relative overflow-hidden`}
+                    className={`p-2 rounded-md shadow-sm border border-black/5 text-sm cursor-grab active:cursor-grabbing mb-2 ${getColorClass(patient.category)} ${isSelected ? 'ring-2 ring-blue-600 ring-offset-1' : 'hover:shadow-md'} transition-all relative select-none`}
                 >
-                    <div className="flex justify-between font-bold text-gray-900 mb-1">
-                        <div className="flex flex-col">
-                            <span className="text-base">{patient.name}</span>
-                            <div className="flex gap-2 text-[10px] text-gray-600 font-normal">
-                                <span>{patient.age} {patient.gender}</span>
-                                <span>•</span>
-                                <span>{patient.id}</span>
-                            </div>
+                    <div className="flex justify-between items-start mb-1">
+                        <div>
+                            <span className="font-bold text-gray-900 block leading-none">{patient.name}</span>
+                            <span className="text-[10px] text-gray-600">{patient.age} {patient.gender}</span>
                         </div>
-                        <span className="px-2 py-0.5 bg-white bg-opacity-60 rounded text-xs h-fit font-black">{patient.category}</span>
+                        {isRevealed ? (
+                            <span className="px-1.5 py-0.5 bg-white/80 rounded text-[10px] font-black border border-black/10">{patient.category}</span>
+                        ) : (
+                            <span className="px-1.5 py-0.5 bg-gray-200 rounded text-[10px] font-bold text-gray-500">?</span>
+                        )}
                     </div>
                     
-                    {showDetail && (
-                        <div className="flex gap-3 mt-3 mb-2 bg-white bg-opacity-50 p-3 rounded border border-white/50">
-                            <div className="shrink-0 mr-2">
-                                <StickFigure injuryLoc={patient.injuryLoc} />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-gray-900 leading-tight text-xs font-medium mb-2">{patient.text}</p>
-                                <div className="text-xs text-gray-500 uppercase font-bold mb-1">Clinical Vitals</div>
-                                <VitalsDisplay vitals={patient.vitals} />
-                            </div>
-                        </div>
-                    )}
-                    
-                    {!showDetail && (
+                    {isRevealed ? (
                         <>
-                            <p className="text-gray-800 leading-tight line-clamp-2 mb-2">{patient.text}</p>
-                            {/* Mini Vitals Strip for Board View */}
-                            <div className="flex gap-2 text-[10px] text-gray-600 font-mono bg-white/40 p-1 rounded">
-                                <span className={patient.vitals.hr > 100 ? 'text-red-600 font-bold' : ''}>HR:{patient.vitals.hr}</span>
-                                <span className={patient.vitals.sbp < 90 ? 'text-red-600 font-bold' : ''}>BP:{patient.vitals.sbp}</span>
+                            <div className="flex gap-2 items-center">
+                                <div className="text-gray-800 text-[10px] leading-tight flex-1 line-clamp-2">{patient.text}</div>
                             </div>
+                            <VitalsDisplay vitals={patient.vitals} />
                         </>
+                    ) : (
+                        <div className="text-[10px] text-gray-500 italic py-2 text-center">Awaiting Triage...</div>
                     )}
 
-                    <div className="mt-2 flex justify-between items-center text-xs font-medium text-gray-600 border-t border-black/5 pt-1">
-                        <span>Gate: Turn {patient.timer}</span>
-                        {patient.treated && <span className="text-green-800 font-bold flex items-center">✓ Stabilized</span>}
+                    <div className="mt-1 flex justify-between items-center text-[10px] font-medium text-gray-600 border-t border-black/5 pt-1">
+                        {patient.treated ? 
+                            <span className="text-emerald-700 font-bold flex items-center gap-1">✓ Stable</span> : 
+                            <span className="text-amber-700 font-bold flex items-center gap-1">⚠ Unstable</span>
+                        }
+                        {patient.category === 'P1' && !patient.treated && (
+                             <span className="text-red-600 animate-pulse font-black">CRITICAL</span>
+                        )}
                     </div>
                 </div>
             );
         };
 
-        const ZoneDisplay = ({ zone, patients, onPatientSelect, selectedPatientId }) => {
+        const ZoneDisplay = ({ zone, patients, onPatientSelect, selectedPatientId, onDrop, onDragOver }) => {
             const zonePatients = patients.filter(p => p.location === zone.id);
             const isFull = zonePatients.length >= zone.capacity;
+            const isOverflow = zonePatients.length > zone.capacity;
 
             return (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full flex flex-col overflow-hidden">
-                    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center">
-                        <h3 className="font-semibold text-gray-700">{zone.name}</h3>
-                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${isFull ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                <div 
+                    onDragOver={onDragOver}
+                    onDrop={(e) => onDrop(e, zone.id)}
+                    className={`bg-white rounded-lg shadow-sm border h-full flex flex-col overflow-hidden zone-card ${isOverflow ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-200'}`}
+                >
+                    <div className={`px-3 py-2 border-b flex justify-between items-center ${zone.id === 'morgue' ? 'bg-gray-800 text-white' : 'bg-gray-50 text-gray-700'}`}>
+                        <h3 className="font-bold text-xs uppercase tracking-wide truncate">{zone.name}</h3>
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${isFull ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
                             {zonePatients.length}/{zone.capacity}
                         </span>
                     </div>
-                    <div className="flex-1 p-3 overflow-y-auto min-h-[150px] bg-slate-50">
+                    <div className="flex-1 p-2 overflow-y-auto bg-slate-50 min-h-[120px]">
                         {zonePatients.length === 0 ? (
-                            <div className="h-full flex items-center justify-center text-gray-400 text-xs italic">Empty Zone</div>
+                            <div className="h-full flex items-center justify-center text-gray-300 text-[10px] font-bold uppercase tracking-widest pointer-events-none">Drop Here</div>
                         ) : (
                             zonePatients.map(p => (
                                 <PatientCard 
@@ -347,7 +230,7 @@
                                     patient={p} 
                                     onSelect={onPatientSelect}
                                     isSelected={selectedPatientId === p.uniqueId}
-                                    showDetail={false}
+                                    onDragStart={(e, id) => e.dataTransfer.setData("patientId", id)}
                                 />
                             ))
                         )}
@@ -356,134 +239,48 @@
             );
         };
 
-        const ActionPanel = ({ role, ap, selectedPatient, onMove, onTreat, allZones }) => {
-            if (!role) return <div className="bg-white p-6 rounded-lg shadow-sm text-center text-gray-500 border border-gray-200">Select a Role to begin actions</div>;
+        const SitrepForm = ({ turn, patients }) => {
+            const p1Count = patients.filter(p => p.category === 'P1' && p.location !== 'discharged' && p.location !== 'morgue').length;
+            const p2Count = patients.filter(p => p.category === 'P2' && p.location !== 'discharged' && p.location !== 'morgue').length;
+            const p3Count = patients.filter(p => p.category === 'P3' && p.location !== 'discharged' && p.location !== 'morgue').length;
+            const total = p1Count + p2Count + p3Count;
 
             return (
-                <div className="bg-white p-5 rounded-lg shadow-md border-t-4 border-blue-600">
-                    <div className="flex justify-between items-start mb-6">
-                        <div>
-                            <h2 className="font-bold text-xl text-gray-900">{role.name}</h2>
-                            <p className="text-sm text-gray-500 mt-1">{role.desc}</p>
-                        </div>
-                        <div className="text-center bg-blue-50 px-4 py-2 rounded-lg border border-blue-100">
-                            <div className="text-2xl font-black text-blue-700">{ap}</div>
-                            <div className="text-[10px] uppercase tracking-wider text-blue-600 font-semibold">AP Remaining</div>
-                        </div>
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-2 justify-center">
+                        <img src={LOGO_URL} className="h-8" />
+                        <span className="font-bold text-blue-900">WMEBEM Incident Command</span>
                     </div>
-
-                    {!selectedPatient ? (
-                        <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                            <p className="text-gray-500 text-sm">Select a patient on the board<br/>to perform clinical actions.</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {/* Expanded Details View in Sidebar */}
-                            <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
-                                <div className="flex justify-between items-start mb-2">
-                                    <div>
-                                        <span className="font-bold text-blue-900 block text-lg">{selectedPatient.name}</span>
-                                        <span className="text-xs text-blue-600">{selectedPatient.age} {selectedPatient.gender} • {selectedPatient.id}</span>
-                                    </div>
-                                    <span className="text-sm font-black px-3 py-1 bg-white rounded text-blue-800 shadow-sm">{selectedPatient.category}</span>
-                                </div>
-                                
-                                <div className="flex gap-4 mt-4 mb-2 bg-white p-3 rounded border border-blue-100 shadow-inner">
-                                    <div className="shrink-0 pt-2">
-                                        <StickFigure injuryLoc={selectedPatient.injuryLoc} />
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="text-sm text-blue-900 font-medium mb-3">{selectedPatient.text}</p>
-                                        <div className="text-xs text-gray-500 uppercase font-bold mb-1">Clinical Vitals</div>
-                                        <VitalsDisplay vitals={selectedPatient.vitals} />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-3">
-                                <button 
-                                    onClick={onTreat}
-                                    disabled={ap < 1 || selectedPatient.treated}
-                                    className={`w-full py-3 px-4 rounded-lg font-bold text-sm shadow transition-all transform active:scale-95 flex items-center justify-center gap-2 ${
-                                        ap < 1 || selectedPatient.treated 
-                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                                        : 'bg-emerald-600 hover:bg-emerald-700 text-white hover:shadow-lg'
-                                    }`}
-                                >
-                                    {selectedPatient.treated ? (
-                                        <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg> Patient Stabilized</>
-                                    ) : (
-                                        'Treat / Stabilize (1 AP)'
-                                    )}
-                                </button>
-                                
-                                <div className="bg-gray-50 p-3 rounded border border-gray-200">
-                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Transfer Patient (1 AP)</label>
-                                    <select 
-                                        className="w-full p-2 border border-gray-300 rounded text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none disabled:bg-gray-100"
-                                        onChange={(e) => onMove(e.target.value)}
-                                        value=""
-                                        disabled={ap < 1}
-                                    >
-                                        <option value="" disabled>Select Destination...</option>
-                                        {allZones
-                                            .filter(z => z.id !== selectedPatient.location)
-                                            .map(z => (
-                                                <option key={z.id} value={z.id}>{z.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        const SitrepForm = ({ turn }) => {
-            // Static display for simulation feel
-            return (
-                <div className="space-y-6">
-                    <div className="bg-amber-50 border-l-4 border-amber-500 p-4">
-                        <div className="flex">
-                            <div className="ml-3">
-                                <p className="text-sm text-amber-700">
-                                    <strong>Command Note:</strong> Ensure all critical P1s have been moved to Resus/Theatres before submitting.
-                                </p>
-                            </div>
-                        </div>
+                    <div className="bg-amber-50 border-l-4 border-amber-500 p-3 text-xs text-amber-800">
+                        <strong>Command Note:</strong> Ensure accuracy. False reporting costs points.
                     </div>
-                    
-                    <div className="border rounded-lg overflow-hidden">
-                        <div className="bg-gray-100 px-4 py-2 border-b font-bold text-gray-700">METHANE Report Structure</div>
-                        <div className="p-4 space-y-3">
-                            <div className="grid grid-cols-12 gap-4 items-center">
-                                <div className="col-span-3 font-bold text-right text-gray-600">M</div>
-                                <div className="col-span-9"><input type="text" className="w-full border-gray-300 rounded shadow-sm text-sm p-2 border" value="MAJOR INCIDENT DECLARED" readOnly /></div>
+                    <div className="border rounded bg-white overflow-hidden text-sm">
+                        <div className="bg-gray-100 px-4 py-2 font-bold border-b text-center text-gray-600">METHANE Report</div>
+                        <div className="p-4 space-y-2">
+                            <div className="grid grid-cols-6 gap-2 items-center">
+                                <div className="font-bold text-right text-gray-500">M</div>
+                                <div className="col-span-5"><input type="text" className="w-full bg-gray-50 border border-gray-200 rounded px-2 py-1 text-xs font-mono" value="MAJOR INCIDENT DECLARED" readOnly /></div>
                             </div>
-                            <div className="grid grid-cols-12 gap-4 items-center">
-                                <div className="col-span-3 font-bold text-right text-gray-600">E</div>
-                                <div className="col-span-9"><input type="text" className="w-full border-gray-300 rounded shadow-sm text-sm p-2 border" placeholder="Exact Location..." /></div>
-                            </div>
-                            <div className="grid grid-cols-12 gap-4 items-center">
-                                <div className="col-span-3 font-bold text-right text-gray-600">T</div>
-                                <div className="col-span-9"><input type="text" className="w-full border-gray-300 rounded shadow-sm text-sm p-2 border" defaultValue="Mass Casualty" /></div>
-                            </div>
-                            <div className="grid grid-cols-12 gap-4 items-center">
-                                <div className="col-span-3 font-bold text-right text-gray-600">H</div>
-                                <div className="col-span-9"><input type="text" className="w-full border-gray-300 rounded shadow-sm text-sm p-2 border" placeholder="Hazards..." /></div>
-                            </div>
-                            <div className="grid grid-cols-12 gap-4 items-center">
-                                <div className="col-span-3 font-bold text-right text-gray-600">A</div>
-                                <div className="col-span-9"><input type="text" className="w-full border-gray-300 rounded shadow-sm text-sm p-2 border" placeholder="Access routes..." /></div>
-                            </div>
-                            <div className="grid grid-cols-12 gap-4 items-center">
-                                <div className="col-span-3 font-bold text-right text-gray-600">N</div>
-                                <div className="col-span-9"><input type="text" className="w-full border-gray-300 rounded shadow-sm text-sm p-2 border" placeholder="Number of casualties..." /></div>
-                            </div>
-                            <div className="grid grid-cols-12 gap-4 items-center">
-                                <div className="col-span-3 font-bold text-right text-gray-600">E</div>
-                                <div className="col-span-9"><input type="text" className="w-full border-gray-300 rounded shadow-sm text-sm p-2 border" placeholder="Emergency services present..." /></div>
+                            <div className="grid grid-cols-6 gap-2 items-center">
+                                <div className="font-bold text-right text-gray-500">N</div>
+                                <div className="col-span-5 grid grid-cols-4 gap-2">
+                                    <div className="bg-red-50 border border-red-100 rounded p-1 text-center">
+                                        <div className="text-[10px] text-red-500 font-bold">P1</div>
+                                        <div className="font-bold text-red-700">{p1Count}</div>
+                                    </div>
+                                    <div className="bg-yellow-50 border border-yellow-100 rounded p-1 text-center">
+                                        <div className="text-[10px] text-yellow-600 font-bold">P2</div>
+                                        <div className="font-bold text-yellow-700">{p2Count}</div>
+                                    </div>
+                                    <div className="bg-green-50 border border-green-100 rounded p-1 text-center">
+                                        <div className="text-[10px] text-green-600 font-bold">P3</div>
+                                        <div className="font-bold text-green-700">{p3Count}</div>
+                                    </div>
+                                    <div className="bg-gray-50 border border-gray-100 rounded p-1 text-center">
+                                        <div className="text-[10px] text-gray-500 font-bold">TOT</div>
+                                        <div className="font-bold text-gray-700">{total}</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -491,315 +288,427 @@
             );
         };
 
-        const Timer = ({ isActive }) => {
-            const [seconds, setSeconds] = useState(120);
-
-            useEffect(() => {
-                let interval = null;
-                if (isActive && seconds > 0) {
-                    interval = setInterval(() => {
-                        setSeconds(seconds => seconds - 1);
-                    }, 1000);
-                } else if (seconds === 0) {
-                    clearInterval(interval);
-                }
-                return () => clearInterval(interval);
-            }, [isActive, seconds]);
-
-            // Reset timer when turn changes (logic handled in parent ideally, but simplified here)
-            useEffect(() => {
-                if (isActive) setSeconds(120);
-            }, [isActive]);
-
-            const formatTime = (time) => {
-                const minutes = Math.floor(time / 60);
-                const seconds = time % 60;
-                return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-            };
-
-            return (
-                <div className={`text-sm font-mono px-3 py-1 rounded border ${seconds < 30 ? 'bg-red-100 text-red-700 border-red-300 animate-pulse' : 'bg-white text-gray-700 border-gray-300'}`}>
-                    ⏱ {formatTime(seconds)}
+        const UserGuide = () => (
+            <div className="space-y-4 text-sm text-gray-700">
+                <div className="flex items-center gap-3 mb-4 border-b pb-4">
+                    <img src={LOGO_URL} className="h-12" />
+                    <div>
+                        <h3 className="font-bold text-lg text-blue-900">Digital Simulation Guide</h3>
+                        <p className="text-xs text-gray-500">WMEBEM Official Training Tool</p>
+                    </div>
                 </div>
-            );
-        };
+                
+                <div>
+                    <h4 className="font-bold text-blue-800 mb-1">1. Objectives</h4>
+                    <ul className="list-disc pl-5 space-y-1 text-xs">
+                        <li>**Triage:** Identify P1 (Red) patients immediately.</li>
+                        <li>**Flow:** Keep the Ambulance Bay clear. Blockage = Failure.</li>
+                        <li>**Treat:** Use AP to stabilise patients. P1s die if untreated.</li>
+                    </ul>
+                </div>
 
-        // --- MAIN APP LOGIC ---
+                <div>
+                    <h4 className="font-bold text-blue-800 mb-1">2. Command Roles</h4>
+                    <ul className="space-y-2 text-xs">
+                        <li className="bg-slate-50 p-2 rounded">
+                            <span className="font-bold block">Silver Commander (4 AP)</span>
+                            Use *Request Mutual Aid* to get more Staff.
+                        </li>
+                        <li className="bg-slate-50 p-2 rounded">
+                            <span className="font-bold block">Bronze Consultant (5 AP)</span>
+                            Use *Rapid Triage* to reveal all incoming patients at once.
+                        </li>
+                        <li className="bg-slate-50 p-2 rounded">
+                            <span className="font-bold block">Nurse Charge (4 AP)</span>
+                            Use *Huddle* to restore AP to the team.
+                        </li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 className="font-bold text-blue-800 mb-1">3. Mechanics</h4>
+                    <ul className="list-disc pl-5 space-y-1 text-xs">
+                        <li>**Drag & Drop:** Move patients to zones.</li>
+                        <li>**Resources:** ICU needs Vents. Resus needs Staff. P1 treatment needs Blood.</li>
+                        <li>**Scoring:** +Points for Discharging stable patients. -Points for Deaths.</li>
+                    </ul>
+                </div>
+            </div>
+        );
+
+        const Modal = ({ title, children, actions }) => (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden transform transition-all border border-gray-200">
+                    <div className="bg-slate-50 px-6 py-4 flex justify-between items-center border-b">
+                        <h2 className="text-lg font-bold text-slate-800 tracking-wide">{title}</h2>
+                    </div>
+                    <div className="p-6 max-h-[70vh] overflow-y-auto">
+                        {children}
+                    </div>
+                    <div className="bg-gray-50 px-6 py-4 border-t flex justify-end gap-3">
+                        {actions}
+                    </div>
+                </div>
+            </div>
+        );
 
         const App = () => {
-            const [gameStarted, setGameStarted] = useState(false);
+            const [gameState, setGameState] = useState('start');
             const [playerCount, setPlayerCount] = useState(1);
-            const [activeRoles, setActiveRoles] = useState([]);
-            const [timerActive, setTimerActive] = useState(false);
-            
             const [turn, setTurn] = useState(1);
-            const [phase, setPhase] = useState(0);
-            const [patients, setPatients] = useState([]);
+            const [score, setScore] = useState(100);
+            const [deaths, setDeaths] = useState(0);
+            const [discharged, setDischarged] = useState(0);
+            
             const [roleStates, setRoleStates] = useState([]);
             const [currentRoleId, setCurrentRoleId] = useState(null);
-            const [selectedPatientId, setSelectedPatientId] = useState(null);
-            const [eventLog, setEventLog] = useState([]);
-            const [showSitrep, setShowSitrep] = useState(false);
-            const [showEventModal, setShowEventModal] = useState(false);
-            const [currentEvent, setCurrentEvent] = useState(null);
             
-            const [resources, setResources] = useState({ staff: 12, blood: 20, vents: 8 });
+            const [patients, setPatients] = useState([]);
+            const [selectedPatientId, setSelectedPatientId] = useState(null);
+            const [resources, setResources] = useState({ staff: 15, blood: 20, vents: 8 });
+            
+            const [eventLog, setEventLog] = useState([]);
+            const [modalContent, setModalContent] = useState(null); // 'sitrep', 'event', 'guide', null
 
             const currentRole = roleStates.find(r => r.id === currentRoleId);
             const selectedPatient = patients.find(p => p.uniqueId === selectedPatientId);
 
-            const addLog = (msg) => setEventLog(prev => [`[Turn ${turn}] ${msg}`, ...prev]);
+            const addLog = (msg) => setEventLog(prev => [`T${turn}: ${msg}`, ...prev]);
 
-            const startGame = (count) => {
-                setPlayerCount(count);
+            // --- ACTIONS ---
+
+            const startGame = () => {
                 const initialRoles = ALL_ROLES.map(r => ({ ...r, currentAp: r.ap }));
                 setRoleStates(initialRoles);
-                setCurrentRoleId(initialRoles[1].id); // Start as Bronze
-                setEventLog(["INCIDENT DECLARED: Mass Casualty Event initiated."]);
-                
-                spawnPatients(6); // Initial surge
-                setGameStarted(true);
-                setTimerActive(true);
+                setCurrentRoleId(initialRoles[0].id);
+                setEventLog([`MAJOR INCIDENT DECLARED. Team size: ${playerCount}`]);
+                spawnPatients(5); 
+                setGameState('playing');
+                setScore(100);
             };
 
             const spawnPatients = (count) => {
                 const newPatients = [];
-                for(var i=0; i<count; i++) {
+                for(let i=0; i<count; i++) {
                     const template = PATIENT_DECK[Math.floor(Math.random() * PATIENT_DECK.length)];
-                    const identity = generateIdentity();
                     newPatients.push({
                         ...template,
-                        ...identity,
-                        uniqueId: Date.now() + i,
+                        ...generateIdentity(),
+                        uniqueId: Date.now() + i + Math.random(),
                         location: 'amb',
-                        status: 'untriaged',
-                        treated: false
+                        triaged: false,
+                        treated: false,
+                        turnsUntreated: 0
                     });
                 }
                 setPatients(prev => [...prev, ...newPatients]);
-                addLog(`${count} new casualties arrived at Ambulance Bay.`);
             };
 
-            const handleRoleChange = (roleId) => {
-                setCurrentRoleId(roleId);
-                setSelectedPatientId(null);
-            };
-
-            const handleMove = (targetZoneId) => {
-                if (!selectedPatient || currentRole.currentAp < 1) return;
+            const handleDrop = (e, targetZoneId) => {
+                e.preventDefault();
+                const patientId = Number(e.dataTransfer.getData("patientId"));
+                const patient = patients.find(p => p.uniqueId === patientId);
                 
-                const targetZone = ZONES.find(z => z.id === targetZoneId);
-                const patientsInTarget = patients.filter(p => p.location === targetZoneId).length;
-
-                if (patientsInTarget >= targetZone.capacity && targetZone.id !== 'discharged' && targetZone.id !== 'morgue') {
-                    alert(`Cannot move: ${targetZone.name} is at full capacity!`);
+                if (!patient || !currentRole) return;
+                if (currentRole.currentAp < 1) {
+                    alert("No Action Points remaining!");
                     return;
                 }
+                if (patient.location === targetZoneId) return;
 
-                // Deduct AP
                 setRoleStates(prev => prev.map(r => r.id === currentRoleId ? { ...r, currentAp: r.currentAp - 1 } : r));
                 
-                // Update Patient Location
-                setPatients(prev => prev.map(p => p.uniqueId === selectedPatient.uniqueId ? { ...p, location: targetZoneId } : p));
+                let updates = { location: targetZoneId };
+                if (targetZoneId === 'triage' || targetZoneId === 'resus' || targetZoneId === 'majors') {
+                    if (!patient.triaged) {
+                        updates.triaged = true;
+                        addLog(`Triaged ${patient.name}: ${patient.category}`);
+                    }
+                }
                 
-                addLog(`${currentRole.name} moved ${selectedPatient.name} to ${targetZone.name}.`);
-                
-                // Resource Cost Logic
-                if (targetZoneId === 'theatre') {
-                    setResources(prev => ({ ...prev, staff: prev.staff - 1 }));
-                } else if (targetZoneId === 'icu') {
-                    setResources(prev => ({ ...prev, vents: Math.max(0, prev.vents - 1) }));
+                if (targetZoneId === 'icu' && resources.vents > 0) {
+                     setResources(prev => ({ ...prev, vents: prev.vents - 1 }));
                 }
 
-                // Auto-reveal triage info if moving to Triage Lane
-                if (targetZoneId === 'triage' && selectedPatient.status === 'untriaged') {
-                    addLog(`TST/MITT Completed for ${selectedPatient.name}: Categorized as ${selectedPatient.category}.`);
+                if (targetZoneId === 'discharged') {
+                    if (patient.treated) {
+                        setScore(s => s + 50);
+                        setDischarged(d => d + 1);
+                        addLog(`${patient.name} discharged.`);
+                    } else {
+                        setScore(s => s - 20);
+                        addLog(`WARNING: ${patient.name} discharged unstable!`);
+                    }
                 }
+
+                setPatients(prev => prev.map(p => p.uniqueId === patientId ? { ...p, ...updates } : p));
+                setSelectedPatientId(patientId); 
             };
 
             const handleTreat = () => {
-                if (!selectedPatient || currentRole.currentAp < 1) return;
-
-                setRoleStates(prev => prev.map(r => r.id === currentRoleId ? { ...r, currentAp: r.currentAp - 1 } : r));
-                setPatients(prev => prev.map(p => p.uniqueId === selectedPatient.uniqueId ? { ...p, treated: true } : p));
-                
-                // Blood Cost logic for P1s
-                if (selectedPatient.category === 'P1') {
-                    setResources(prev => ({ ...prev, blood: Math.max(0, prev.blood - 1) }));
+                if (!selectedPatient || currentRole.currentAp < 1 || selectedPatient.treated) return;
+                if (selectedPatient.category === 'P1' && resources.blood < 1) {
+                    alert("Not enough Blood products!");
+                    return;
                 }
 
-                addLog(`${currentRole.name} performed interventions on ${selectedPatient.name}.`);
+                setRoleStates(prev => prev.map(r => r.id === currentRoleId ? { ...r, currentAp: r.currentAp - 1 } : r));
+                setPatients(prev => prev.map(p => p.uniqueId === selectedPatientId ? { ...p, treated: true } : p));
+                
+                if (selectedPatient.category === 'P1') {
+                    setResources(prev => ({ ...prev, blood: prev.blood - 1 }));
+                }
+                
+                setScore(s => s + 10);
+                addLog(`${currentRole.name} stabilised ${selectedPatient.name}.`);
             };
 
-            const nextTurn = () => {
-                setTimerActive(false); // Pause timer
-                setShowSitrep(true);
+            const useSpecialAbility = () => {
+                if (currentRole.currentAp < currentRole.abilityCost) return;
+
+                setRoleStates(prev => prev.map(r => r.id === currentRoleId ? { ...r, currentAp: r.currentAp - currentRole.abilityCost } : r));
+                addLog(`${currentRole.name} used ${currentRole.ability}`);
+
+                switch(currentRole.id) {
+                    case 'silver': setResources(prev => ({ ...prev, staff: prev.staff + 3 })); break;
+                    case 'bronze': setPatients(prev => prev.map(p => p.location === 'amb' ? { ...p, triaged: true } : p)); break;
+                    case 'nurse': setRoleStates(prev => prev.map(r => r.id !== 'nurse' ? { ...r, currentAp: Math.min(r.ap, r.currentAp + 1) } : r)); break;
+                    case 'resident': 
+                        const p3 = patients.find(p => p.location === 'minors' && !p.treated && p.category === 'P3');
+                        if (p3) {
+                            setPatients(prev => prev.map(p => p.uniqueId === p3.uniqueId ? { ...p, treated: true } : p));
+                            addLog(`Fast Tracked ${p3.name}`);
+                        }
+                        break;
+                    case 'theatre':
+                        const surg = patients.find(p => p.location === 'theatre' && p.treated);
+                        if (surg) setPatients(prev => prev.map(p => p.uniqueId === surg.uniqueId ? { ...p, location: 'icu' } : p));
+                        break;
+                }
             };
 
             const confirmNextTurn = () => {
-                setShowSitrep(false);
-                const newTurn = turn + 1;
-                setTurn(newTurn);
-                setTimerActive(true); // Restart timer
-                
-                // Reset AP for all roles
+                setModalContent(null);
+                setTurn(t => t + 1);
                 setRoleStates(prev => prev.map(r => ({ ...r, currentAp: r.ap })));
 
-                // Advance Phase
-                if (newTurn > 4) setPhase(1);
-                if (newTurn > 8) setPhase(2);
-
-                // Trigger Random Event
-                if (Math.random() > 0.4) {
-                    const evt = EVENTS[Math.floor(Math.random() * EVENTS.length)];
-                    setCurrentEvent(evt);
-                    setShowEventModal(true);
-                    addLog(`EVENT TRIGGERED: ${evt.title}`);
+                if (Math.random() > 0.6) {
+                    // Logic to show event modal could go here, for now simple logic
+                    addLog(`Turn ${turn + 1} Started.`);
                 }
 
-                // New Arrivals (variable)
-                const arrivals = Math.floor(Math.random() * 5);
-                if (arrivals > 0) spawnPatients(arrivals);
+                setPatients(prev => prev.map(p => {
+                    if (p.location === 'morgue' || p.location === 'discharged') return p;
+                    let newP = { ...p };
+                    if (p.category === 'P1' && !p.treated) {
+                        newP.turnsUntreated = (p.turnsUntreated || 0) + 1;
+                        if (newP.turnsUntreated > 1) {
+                            newP.location = 'morgue';
+                            newP.text = "DIED DUE TO DELAYED TREATMENT";
+                            setDeaths(d => d + 1);
+                            setScore(s => s - 100);
+                            addLog(`FATALITY: ${p.name} died awaiting treatment.`);
+                        }
+                    }
+                    return newP;
+                }));
+
+                spawnPatients(Math.floor(Math.random() * 3) + 1);
+            };
+            
+            const getRoleSuggestion = (count) => {
+                if(count === 1) return "You are the Incident Commander (Solo Mode).";
+                if(count === 2) return "P1: Silver (Strategy) + Bronze (Triage) | P2: Nurse + Resident + Theatre (Treatment)";
+                if(count === 3) return "P1: Silver | P2: Bronze + Resident | P3: Nurse + Theatre";
+                if(count === 4) return "P1: Silver | P2: Bronze | P3: Resident | P4: Nurse + Theatre";
+                return "Distribute roles evenly among 5 players.";
             };
 
-            if (!gameStarted) {
-                return <StartScreen onStart={startGame} />;
+            // --- RENDERERS ---
+
+            if (gameState === 'start') {
+                return (
+                    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center border-t-8 border-blue-800">
+                            <img src={LOGO_URL} alt="WMEBEM Logo" className="h-24 mx-auto mb-6 object-contain" />
+                            <h1 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">INCIDENT<span className="text-blue-600">COMMAND</span></h1>
+                            <p className="text-slate-500 mb-6 font-medium">WMEBEM Digital Simulation</p>
+                            
+                            <div className="mb-8">
+                                <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Select Team Size</label>
+                                <div className="flex justify-center gap-2 mb-4">
+                                    {[1, 2, 3, 4, 5].map(num => (
+                                        <button 
+                                            key={num}
+                                            onClick={() => setPlayerCount(num)}
+                                            className={`w-12 h-12 rounded-xl font-bold text-lg transition-all ${playerCount === num ? 'bg-blue-600 text-white scale-110 shadow-lg' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                                        >
+                                            {num}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 min-h-[60px] flex items-center justify-center">
+                                    <p className="text-xs text-blue-800 font-medium leading-relaxed">
+                                        {getRoleSuggestion(playerCount)}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button onClick={startGame} className="w-full py-4 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all transform active:scale-95">
+                                Start Simulation
+                            </button>
+                            <div className="mt-4 text-xs text-slate-400">
+                                Version 5.1 • WMEBEM
+                            </div>
+                        </div>
+                    </div>
+                );
             }
 
             return (
-                <div className="min-h-screen flex flex-col bg-slate-100">
-                    {/* Header with Logo */}
-                    <header className="bg-white border-b border-gray-200 shadow-sm z-10 sticky top-0">
-                        <div className="container mx-auto px-4 py-3">
-                            <div className="flex justify-between items-center">
-                                <div className="flex items-center">
-                                    <img src="https://iili.io/KGQOvkl.md.png" alt="WMEBEM Logo" className="h-14 w-auto mr-4 object-contain" />
-                                    <div>
-                                        <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">INCIDENT<span className="text-blue-600">COMMAND</span></h1>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Digital Simulation v5.0</p>
-                                    </div>
-                                </div>
-                                
-                                <div className="flex items-center gap-6">
-                                    <div className="text-right hidden md:block">
-                                        <div className="text-xs text-gray-400 font-bold uppercase">Current Status</div>
-                                        <div className="text-sm font-bold text-gray-800">Turn {turn}/12 • {PHASES[phase]}</div>
-                                    </div>
-                                    
-                                    {/* Turn Timer Toggle */}
-                                    <Timer isActive={timerActive} />
-
-                                    <button 
-                                        onClick={nextTurn}
-                                        className="bg-blue-800 hover:bg-blue-900 text-white px-5 py-2 rounded-md font-bold shadow transition-colors flex items-center gap-2 text-sm"
-                                    >
-                                        <span>End Turn</span>
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                        </svg>
-                                    </button>
-                                </div>
+                <div className="h-screen flex flex-col bg-slate-100 overflow-hidden">
+                    {/* TOP BAR */}
+                    <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 shrink-0 z-20 shadow-sm">
+                        <div className="flex items-center gap-4">
+                            <img src={LOGO_URL} className="logo-h" />
+                            <div>
+                                <div className="text-xl font-black text-slate-800 leading-none">INCIDENT<span className="text-blue-600">COMMAND</span></div>
+                                <div className="text-[10px] font-bold text-gray-400 tracking-widest uppercase">Turn {turn} • {PHASES[Math.min(2, Math.floor(turn/4))]} • {playerCount} Player Mode</div>
                             </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                            <button onClick={() => setModalContent('guide')} className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                User Guide
+                            </button>
+                            <div className="h-8 w-px bg-gray-200"></div>
+                            <div className="flex gap-4 text-sm font-bold">
+                                <div className="text-emerald-600 flex flex-col items-center leading-none"><span className="text-xs uppercase text-gray-400">Score</span><span className="text-xl">{score}</span></div>
+                                <div className="text-blue-600 flex flex-col items-center leading-none"><span className="text-xs uppercase text-gray-400">Saved</span><span className="text-xl">{discharged}</span></div>
+                                <div className="text-red-600 flex flex-col items-center leading-none"><span className="text-xs uppercase text-gray-400">Dead</span><span className="text-xl">{deaths}</span></div>
+                            </div>
+                            <button onClick={() => setModalContent('sitrep')} className="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2 rounded-lg font-bold text-sm shadow transition-all">
+                                End Turn →
+                            </button>
                         </div>
                     </header>
 
-                    <main className="flex-1 container mx-auto p-4 flex gap-6 overflow-hidden h-[calc(100vh-90px)]">
-                        
-                        {/* Sidebar */}
-                        <div className="w-80 flex flex-col gap-4 shrink-0 overflow-y-auto pb-4 custom-scrollbar">
-                            {/* Role Selection */}
-                            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                                <div className="bg-slate-50 px-4 py-2 border-b border-gray-200">
-                                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Command & Control</h3>
-                                </div>
-                                <div className="divide-y divide-gray-100">
+                    <div className="flex flex-1 overflow-hidden p-4 gap-4">
+                        {/* LEFT: ROLES */}
+                        <div className="w-72 flex flex-col gap-3 shrink-0">
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col min-h-0">
+                                <div className="bg-slate-50 px-4 py-3 border-b border-gray-100"><h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Command Team</h3></div>
+                                <div className="overflow-y-auto flex-1">
                                     {roleStates.map(role => (
-                                        <button
-                                            key={role.id}
-                                            onClick={() => handleRoleChange(role.id)}
-                                            className={`w-full text-left px-4 py-2.5 flex justify-between items-center transition-colors ${
-                                                currentRoleId === role.id 
-                                                ? 'bg-blue-50/80 text-blue-900 border-l-4 border-blue-600' 
-                                                : 'hover:bg-gray-50 text-gray-700 border-l-4 border-transparent'
-                                            }`}
-                                        >
-                                            <span className="text-sm font-semibold">{role.name}</span>
-                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${role.currentAp === 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
-                                                {role.currentAp} AP
-                                            </span>
+                                        <button key={role.id} onClick={() => { setCurrentRoleId(role.id); setSelectedPatientId(null); }} className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors flex justify-between items-center group ${currentRoleId === role.id ? 'bg-blue-50/50 border-l-4 border-l-blue-600' : 'border-l-4 border-l-transparent'}`}>
+                                            <div><div className={`font-bold text-sm ${currentRoleId === role.id ? 'text-blue-900' : 'text-gray-700'}`}>{role.name}</div><div className="text-[10px] text-gray-400 leading-tight">{role.desc}</div></div>
+                                            <div className={`text-sm font-black w-8 h-8 rounded-full flex items-center justify-center ${role.currentAp > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'}`}>{role.currentAp}</div>
                                         </button>
                                     ))}
                                 </div>
                             </div>
-
-                            {/* Resource Monitor */}
-                            <ResourceMonitor resources={resources} />
-
-                            {/* Action Panel Component */}
-                            <ActionPanel 
-                                role={currentRole} 
-                                ap={currentRole?.currentAp}
-                                selectedPatient={selectedPatient}
-                                onMove={handleMove}
-                                onTreat={handleTreat}
-                                allZones={ZONES}
-                            />
-
-                            {/* Event Log */}
-                            <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 min-h-[150px] flex flex-col">
-                                <div className="bg-slate-50 px-4 py-2 border-b border-gray-200">
-                                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Incident Log</h3>
+                            {/* ACTION PANEL */}
+                            <div className="bg-white rounded-xl shadow-md border border-blue-100 p-4 shrink-0">
+                                <h3 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-3">Active: {currentRole?.name}</h3>
+                                <div className="grid gap-2">
+                                    <button onClick={handleTreat} disabled={!selectedPatient || selectedPatient.treated || currentRole.currentAp < 1} className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded font-bold text-sm transition-colors flex items-center justify-center gap-2">
+                                        Treat Patient (1 AP)
+                                    </button>
+                                    <button onClick={useSpecialAbility} disabled={currentRole.currentAp < currentRole.abilityCost} className="w-full py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded font-bold text-sm transition-colors flex items-center justify-center gap-2">
+                                        {currentRole.ability} ({currentRole.abilityCost} AP)
+                                    </button>
                                 </div>
-                                <div className="flex-1 p-2 overflow-y-auto space-y-1 text-[10px] font-mono bg-slate-900 text-green-400 p-3 custom-scrollbar">
-                                    {eventLog.map((log, i) => (
-                                        <div key={i} className="border-b border-gray-800 pb-1 mb-1 opacity-90">
-                                            <span className="text-gray-500 mr-2">[{new Date().toLocaleTimeString()}]</span>
-                                            {log}
-                                        </div>
-                                    ))}
+                            </div>
+                            {/* RESOURCES */}
+                            <div className="bg-slate-800 rounded-xl p-4 text-white shrink-0">
+                                <div className="grid grid-cols-3 gap-2 text-center">
+                                    <div className="bg-slate-700/50 rounded p-1"><div className="text-[10px] text-slate-400 uppercase">Staff</div><div className="font-bold text-lg text-blue-300">{resources.staff}</div></div>
+                                    <div className="bg-slate-700/50 rounded p-1"><div className="text-[10px] text-slate-400 uppercase">Blood</div><div className="font-bold text-lg text-red-400">{resources.blood}</div></div>
+                                    <div className="bg-slate-700/50 rounded p-1"><div className="text-[10px] text-slate-400 uppercase">Vents</div><div className="font-bold text-lg text-emerald-400">{resources.vents}</div></div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Game Board */}
-                        <div className="flex-1 grid grid-cols-3 gap-4 auto-rows-min overflow-y-auto pr-2 pb-20 custom-scrollbar">
-                            {ZONES.map(zone => (
-                                <div key={zone.id} className={`
-                                    ${zone.id === 'resus' || zone.id === 'theatre' ? 'col-span-2' : 'col-span-1'}
-                                    ${zone.id === 'ward' ? 'col-span-3' : ''}
-                                    min-h-[220px]
-                                `}>
-                                    <ZoneDisplay 
-                                        zone={zone} 
-                                        patients={patients} 
-                                        onPatientSelect={(p) => setSelectedPatientId(p.uniqueId)}
-                                        selectedPatientId={selectedPatientId}
-                                    />
+                        {/* CENTER: BOARD */}
+                        <div className="flex-1 bg-white rounded-2xl shadow-inner border border-gray-200 overflow-hidden flex flex-col relative">
+                            <div className="flex-1 overflow-y-auto p-4 relative z-10 custom-scrollbar">
+                                <div className="grid grid-cols-4 gap-4 h-full auto-rows-min">
+                                    <div className="col-span-1 h-[300px]"><ZoneDisplay zone={ZONES[0]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-1 h-[300px]"><ZoneDisplay zone={ZONES[1]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-2 row-span-2 bg-slate-100 rounded-xl border border-slate-200 p-2 gap-2 grid grid-cols-2">
+                                        <div className="col-span-2 text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">ED Clinical Floor</div>
+                                        <div className="h-full"><ZoneDisplay zone={ZONES[2]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                        <div className="h-full"><ZoneDisplay zone={ZONES[3]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                        <div className="col-span-2 h-[200px]"><ZoneDisplay zone={ZONES[4]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    </div>
+                                    <div className="col-span-1 h-[200px]"><ZoneDisplay zone={ZONES[5]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-1 h-[200px]"><ZoneDisplay zone={ZONES[6]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-1 h-[200px]"><ZoneDisplay zone={ZONES[7]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-2 h-[200px]"><ZoneDisplay zone={ZONES[8]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-1 h-[200px]"><ZoneDisplay zone={ZONES[10]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
                                 </div>
-                            ))}
+                            </div>
                         </div>
-                    </main>
 
-                    {/* Modal Overlays */}
-                    {showSitrep && (
-                        <Modal title={`Turn ${turn} SITREP`} onClose={() => {}} 
-                            actions={<button onClick={confirmNextTurn} className="bg-blue-700 text-white px-6 py-2 rounded shadow hover:bg-blue-800 font-bold">Submit Report & Next Turn</button>}>
-                            <SitrepForm turn={turn} />
+                        {/* RIGHT: INFO & LOGS */}
+                        <div className="w-64 flex flex-col gap-4 shrink-0">
+                            <div className="h-1/2 bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col">
+                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Patient Detail</h3>
+                                {selectedPatient ? (
+                                    <div className="flex-1 overflow-y-auto">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <StickFigure injuryLoc={selectedPatient.injuryLoc} />
+                                            <div>
+                                                <div className="font-bold text-lg leading-none">{selectedPatient.name}</div>
+                                                <div className="text-xs text-gray-500 mt-1">{selectedPatient.age} {selectedPatient.gender}</div>
+                                                <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded">{selectedPatient.id}</span>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <div className="bg-slate-50 p-2 rounded border border-slate-100">
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase">Condition</div>
+                                                <p className="text-sm text-slate-700 font-medium leading-snug">{selectedPatient.text}</p>
+                                            </div>
+                                            <VitalsDisplay vitals={selectedPatient.vitals} />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex-1 flex items-center justify-center text-gray-300 text-sm italic">Select a patient</div>
+                                )}
+                            </div>
+                            <div className="h-1/2 bg-slate-900 rounded-xl shadow-inner p-3 flex flex-col overflow-hidden">
+                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Incident Log</div>
+                                <div className="flex-1 overflow-y-auto space-y-1 font-mono text-[10px] text-emerald-400/90 custom-scrollbar">
+                                    {eventLog.map((l, i) => <div key={i} className="border-b border-slate-800 pb-1">{l}</div>)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* FOOTER */}
+                    <footer className="bg-white border-t border-gray-200 p-2 text-[10px] text-gray-500 flex justify-between items-center shrink-0">
+                        <div className="flex gap-4">
+                            <span>© 2025 WMEBEM. Licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">CC BY-NC-SA 4.0</a>.</span>
+                            <span>Free to use and modify with attribution.</span>
+                        </div>
+                        <div className="flex gap-4">
+                            <a href="https://www.england.nhs.uk/ourwork/eprr/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">NHS England EPRR</a>
+                            <span>•</span>
+                            <a href="https://www.england.nhs.uk/publication/clinical-guidelines-for-major-incidents-and-mass-casualty-events/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">Clinical Guidelines</a>
+                            <span>•</span>
+                            <a href="https://www.england.nhs.uk/wp-content/uploads/2018/12/B0128-clinical-guidelines-for-use-in-a-major-incident-v2-2020.pdf" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">Download PDF</a>
+                        </div>
+                    </footer>
+
+                    {/* MODALS */}
+                    {modalContent === 'sitrep' && (
+                        <Modal title={`Turn ${turn} Command SITREP`} actions={<button onClick={confirmNextTurn} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold shadow-lg">Submit & Next Turn</button>}>
+                            <SitrepForm turn={turn} patients={patients} />
                         </Modal>
                     )}
-
-                    {showEventModal && currentEvent && (
-                        <Modal title="INCIDENT UPDATE" onClose={() => setShowEventModal(false)}
-                            actions={<button onClick={() => setShowEventModal(false)} className="bg-red-600 text-white px-6 py-2 rounded shadow hover:bg-red-700 font-bold">Acknowledge</button>}>
-                            <div className="text-center py-4">
-                                <div className="inline-block p-3 bg-red-100 rounded-full mb-4">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                </div>
-                                <h3 className="text-2xl font-bold text-gray-900 mb-2">{currentEvent.title}</h3>
-                                <p className="text-gray-600 text-lg">{currentEvent.effect}</p>
-                            </div>
+                    {modalContent === 'guide' && (
+                        <Modal title="WMEBEM Simulation Guide" actions={<button onClick={() => setModalContent(null)} className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded font-bold shadow-lg">Close Guide</button>}>
+                            <UserGuide />
                         </Modal>
                     )}
                 </div>
