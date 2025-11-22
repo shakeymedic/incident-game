@@ -21,12 +21,12 @@
         .zone-card:active { transform: scale(0.98); background-color: #f8fafc; }
         .zone-card.drag-over { background-color: #f0f9ff; border-color: #0284c7; box-shadow: 0 0 0 4px #0284c7 inset; }
         
-        /* Patient Colors */
+        /* Patient Colours */
         .p1-bg { background-color: #fee2e2; border-left: 5px solid #dc2626; } 
         .p2-bg { background-color: #fef3c7; border-left: 5px solid #d97706; } 
         .p3-bg { background-color: #d1fae5; border-left: 5px solid #059669; } 
         .dead-bg { background-color: #e2e8f0; border-left: 5px solid #1e293b; }
-        .neutral-bg { background-color: #f1f5f9; border-left: 5px solid #94a3b8; } /* New Neutral Color */
+        .neutral-bg { background-color: #f1f5f9; border-left: 5px solid #94a3b8; } 
         
         /* Animations */
         .hud-enter { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
@@ -53,6 +53,56 @@
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+        // --- AUDIO MANAGER (Robust Singleton) ---
+        let audioCtx = null;
+
+        const getAudioCtx = () => {
+            if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return audioCtx;
+        };
+
+        const initAudio = () => {
+             const ctx = getAudioCtx();
+             if (ctx && ctx.state === 'suspended') {
+                 ctx.resume();
+             }
+        };
+
+        const playSound = (type) => {
+            try {
+                const ctx = getAudioCtx();
+                if (!ctx) return;
+                // Try to resume if suspended (requires user gesture previously)
+                if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                const now = ctx.currentTime;
+                
+                if (type === 'ping') {
+                    osc.type = 'sine'; osc.frequency.setValueAtTime(600, now); osc.frequency.exponentialRampToValueAtTime(100, now + 0.5);
+                    gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                    osc.start(now); osc.stop(now + 0.5);
+                } else if (type === 'treat') {
+                    osc.type = 'triangle'; osc.frequency.setValueAtTime(880, now); gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now + 0.1); osc.start(now); osc.stop(now + 0.1);
+                    const osc2 = ctx.createOscillator(); const gain2 = ctx.createGain(); osc2.connect(gain2); gain2.connect(ctx.destination);
+                    osc2.type = 'triangle'; osc2.frequency.setValueAtTime(880, now + 0.15); gain2.gain.setValueAtTime(0.1, now + 0.15); gain2.gain.linearRampToValueAtTime(0, now + 0.25); osc2.start(now + 0.15); osc2.stop(now + 0.25);
+                } else if (type === 'flatline') {
+                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, now); gain.gain.setValueAtTime(0.15, now); gain.gain.linearRampToValueAtTime(0, now + 2.5); osc.start(now); osc.stop(now + 2.5);
+                } else if (type === 'move') {
+                    osc.type = 'sine'; osc.frequency.setValueAtTime(300, now); gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now + 0.05); osc.start(now); osc.stop(now + 0.05);
+                } else if (type === 'alert') {
+                    osc.type = 'square'; osc.frequency.setValueAtTime(440, now); osc.frequency.linearRampToValueAtTime(880, now + 0.3); gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now + 0.3); osc.start(now); osc.stop(now + 0.3);
+                }
+            } catch (e) {
+                // Silent fail for audio issues
+            }
+        };
 
         // --- ICONS ---
         const IconWrapper = ({ children, size = 20, strokeWidth = 2, className = "", ...props }) => ( <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>{children}</svg> );
@@ -84,14 +134,6 @@
         // --- CONSTANTS ---
         const LOGO_URL = "https://iili.io/KGQOvkl.md.png";
         
-        // --- SCENARIOS ---
-        const SCENARIOS = {
-            standard: { name: "Standard Incident", desc: "A major incident has been declared. Balanced mix of trauma and medical casualties.", p1: 0.2, p2: 0.3, p3: 0.5 },
-            chemical: { name: "Chemical Attack", desc: "CBRN incident. High number of airway risks (P1) requiring advanced skills.", p1: 0.5, p2: 0.3, p3: 0.2, type: 'chem' },
-            bus_crash: { name: "Bus Crash", desc: "Multi-vehicle collision. High volume of blunt trauma (Head/Chest/Abdo).", p1: 0.3, p2: 0.4, p3: 0.3, type: 'trauma' },
-            collapse: { name: "Structural Collapse", desc: "Building collapse. Crush injuries and dust inhalation.", p1: 0.25, p2: 0.4, p3: 0.35, type: 'crush' }
-        };
-
         // --- EVENTS ---
         const RANDOM_EVENTS = [
             { id: 'needlestick', title: 'Needlestick Injury', desc: 'A Nurse has sustained a needlestick injury and must report to Occ Health.', effect: 'One Nurse removed for 1 turn.' },
@@ -101,6 +143,13 @@
             { id: 'rapid_offload', title: 'Rapid Offload', desc: 'Multiple ambulances arrive at once.', effect: '3 Extra Patients added to Ambulance Bay.' },
             { id: 'it_failure', title: 'IT Systems Failure', desc: 'EPR is down. We are on paper.', effect: 'Triage costs 2 AP this turn.' }
         ];
+
+        const SCENARIOS = {
+            standard: { name: "Standard Incident", desc: "A major incident has been declared. Balanced mix of trauma and medical casualties.", p1: 0.2, p2: 0.3, p3: 0.5 },
+            chemical: { name: "Chemical Attack", desc: "CBRN incident. High number of airway risks (P1) requiring advanced skills.", p1: 0.5, p2: 0.3, p3: 0.2, type: 'chem' },
+            bus_crash: { name: "Bus Crash", desc: "Multi-vehicle collision. High volume of blunt trauma (Head/Chest/Abdo).", p1: 0.3, p2: 0.4, p3: 0.3, type: 'trauma' },
+            collapse: { name: "Structural Collapse", desc: "Building collapse. Crush injuries and dust inhalation.", p1: 0.25, p2: 0.4, p3: 0.35, type: 'crush' }
+        };
 
         // Role Templates
         const ROLE_TEMPLATES = {
@@ -298,7 +347,7 @@
                         <div className="bg-slate-800 p-4 rounded-xl"><div className="text-sm text-slate-500 uppercase font-bold">Saved</div><div className="text-3xl font-black text-emerald-400">{stats.discharged}</div></div>
                         <div className="bg-slate-800 p-4 rounded-xl"><div className="text-sm text-slate-500 uppercase font-bold">Deaths</div><div className="text-3xl font-black text-red-400">{stats.deaths}</div></div>
                     </div>
-                    <button onClick={onRestart} className="bg-white text-slate-900 px-8 py-4 rounded-xl font-bold text-xl hover:scale-105 transition-transform shadow-xl">Initialize New Simulation</button>
+                    <button onClick={onRestart} className="bg-white text-slate-900 px-8 py-4 rounded-xl font-bold text-xl hover:scale-105 transition-transform shadow-xl">Initialise New Simulation</button>
                 </div>
             </div>
         );
@@ -350,7 +399,7 @@
         };
 
         const Counter = ({ label, value, onChange, min, max }) => (
-            <div className="flex justify-between items-center bg-slate-50 p-3 rounded border border-slate-200"><span className="text-sm font-bold text-slate-700">{label}</span><div className="flex items-center gap-3"><button onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} className="w-8 h-8 rounded bg-white border flex items-center justify-center hover:bg-slate-100 disabled:opacity-50 text-slate-600"><Minus size={16}/></button><span className="w-6 text-center font-bold">{value}</span><button onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} className="w-8 h-8 rounded bg-white border flex items-center justify-center hover:bg-slate-100 disabled:opacity-50 text-slate-600"><Plus size={16}/></button></div></div>
+            <div className="flex justify-between items-center bg-slate-50 p-3 rounded border border-slate-200"><span className="text-sm font-bold text-slate-700">{label}</span><div className="flex items-center gap-3"><button type="button" onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} className="w-8 h-8 rounded bg-white border flex items-center justify-center hover:bg-slate-100 disabled:opacity-50 text-slate-600 cursor-pointer"><Minus size={16}/></button><span className="w-6 text-center font-bold">{value}</span><button type="button" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} className="w-8 h-8 rounded bg-white border flex items-center justify-center hover:bg-slate-100 disabled:opacity-50 text-slate-600 cursor-pointer"><Plus size={16}/></button></div></div>
         );
 
         // --- MAIN APP ---
@@ -376,14 +425,12 @@
             const [isMuted, setIsMuted] = useState(false);
 
             // Audio wrapper using state
-            const playAudio = (type) => {
-                if (!isMuted) playSound(type);
-            };
-
+            const playAudio = (type) => { if (!isMuted) playSound(type); };
             const formatTime = (mins) => { const h = Math.floor(mins/60); const m = mins%60; return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`; };
             const currentRole = roleStates.find(r => r.id === currentRoleId);
             const selectedPatient = patients.find(p => p.uniqueId === selectedPatientId);
 
+            // Load Save
             useEffect(() => {
                 const saved = localStorage.getItem('wmebem_save');
                 if (saved) { try { JSON.parse(saved); } catch(e) { console.error("Save load error", e); } }
@@ -397,12 +444,14 @@
             const loadGame = () => {
                 const saved = localStorage.getItem('wmebem_save');
                 if (saved) {
-                    const data = JSON.parse(saved);
-                    setGameState(data.gameState); setPlayerCount(data.playerCount); setStaffCounts(data.staffCounts); setTurn(data.turn);
-                    setScore(data.score); setDeaths(data.deaths); setDischarged(data.discharged); setRoleStates(data.roleStates);
-                    setCurrentRoleId(data.currentRoleId); setPatients(data.patients); setResources(data.resources); setSimTime(data.simTime);
-                    if(data.selectedScenario) setSelectedScenario(data.selectedScenario);
-                    if(data.isMuted !== undefined) setIsMuted(data.isMuted);
+                    try {
+                        const data = JSON.parse(saved);
+                        setGameState(data.gameState); setPlayerCount(data.playerCount); setStaffCounts(data.staffCounts); setTurn(data.turn);
+                        setScore(data.score); setDeaths(data.deaths); setDischarged(data.discharged); setRoleStates(data.roleStates);
+                        setCurrentRoleId(data.currentRoleId); setPatients(data.patients); setResources(data.resources); setSimTime(data.simTime);
+                        if(data.selectedScenario) setSelectedScenario(data.selectedScenario);
+                        if(data.isMuted !== undefined) setIsMuted(data.isMuted);
+                    } catch(e) { console.error("Load error", e); }
                 }
             };
 
@@ -415,17 +464,18 @@
 
             const handleUndo = () => {
                 if (historyStack.length === 0) return;
-                const prev = JSON.parse(historyStack[historyStack.length - 1]);
-                setRoleStates(prev.roleStates); setPatients(prev.patients); setResources(prev.resources);
-                setScore(prev.score); setDeaths(prev.deaths); setDischarged(prev.discharged);
-                setSimTime(prev.simTime); setTurn(prev.turn); setActiveEvent(prev.activeEvent);
-                setHistoryStack(prev => prev.slice(0, -1));
-                setSelectedPatientId(null);
+                try {
+                    const prev = JSON.parse(historyStack[historyStack.length - 1]);
+                    setRoleStates(prev.roleStates); setPatients(prev.patients); setResources(prev.resources);
+                    setScore(prev.score); setDeaths(prev.deaths); setDischarged(prev.discharged);
+                    setSimTime(prev.simTime); setTurn(prev.turn); setActiveEvent(prev.activeEvent);
+                    setHistoryStack(prev => prev.slice(0, -1));
+                    setSelectedPatientId(null);
+                } catch(e) { console.error("Undo error", e); }
             };
 
             const NAMES = ["Smith", "Jones", "Taylor", "Brown", "Williams", "Wilson", "Johnson", "Davies"];
             const MALE = ["James", "John", "Robert", "Michael"]; const FEMALE = ["Mary", "Patricia", "Jennifer", "Linda"];
-            // Basic Templates
             const PATIENT_TEMPLATES = {
                 standard: [
                     { category: 'P1', injuryLoc: 'chest', text: 'GSW Chest. Needs Thoracotomy.', reqSkill: 'advanced_trauma', vitals: { hr: 140, sbp: 70, rr: 32, spo2: 88 } },
@@ -456,29 +506,19 @@
                     if (r < scenarioConfig.p1) cat = 'P1';
                     else if (r < scenarioConfig.p1 + scenarioConfig.p2) cat = 'P2';
 
-                    // Select Template
                     let pool = PATIENT_TEMPLATES.standard;
                     if (scenarioConfig.type === 'chem' && Math.random() > 0.3) pool = PATIENT_TEMPLATES.chem;
                     if (scenarioConfig.type === 'crush' && Math.random() > 0.3) pool = PATIENT_TEMPLATES.crush;
                     
-                    // Filter pool by category if possible, else fallback
                     let options = pool.filter(p => p.category === cat);
                     if (options.length === 0) options = pool; 
-                    
                     const base = options[Math.floor(Math.random() * options.length)];
                     const name = `${(isMale ? MALE : FEMALE)[Math.floor(Math.random() * 4)]} ${NAMES[Math.floor(Math.random() * NAMES.length)]}`;
                     
                     return { 
-                        ...base, 
-                        category: cat, // Enforce probability distribution
-                        name, 
-                        age: Math.floor(Math.random()*60)+18+'y', 
-                        gender: isMale?'M':'F', 
-                        uniqueId: Date.now()+i+Math.random(), 
-                        location: 'amb', 
-                        triaged: false, 
-                        treated: false, 
-                        scanned: false, 
+                        ...base, category: cat, name, 
+                        age: Math.floor(Math.random()*60)+18+'y', gender: isMale?'M':'F', 
+                        uniqueId: Date.now()+i+Math.random(), location: 'amb', triaged: false, treated: false, scanned: false, 
                         history: [{time: formatTime(currentSimTime), msg: 'Arrived via Ambulance'}] 
                     };
                 });
@@ -487,12 +527,17 @@
             };
 
             const startGame = () => {
-                const generatedRoles = generateRoster(staffCounts);
-                setRoleStates(generatedRoles.map(r => ({ ...r, currentAp: r.ap, disabled: false })));
-                setCurrentRoleId(generatedRoles[0].id);
-                spawnPatients(6, 12 * 60);
-                setGameState('playing');
-                localStorage.removeItem('wmebem_save');
+                try {
+                    initAudio(); // Resume context on user gesture
+                    const generatedRoles = generateRoster(staffCounts);
+                    setRoleStates(generatedRoles.map(r => ({ ...r, currentAp: r.ap, disabled: false })));
+                    setCurrentRoleId(generatedRoles[0].id);
+                    spawnPatients(6, 12 * 60);
+                    setGameState('playing');
+                    localStorage.removeItem('wmebem_save');
+                } catch(e) {
+                    console.error("Start game error", e);
+                }
             };
 
             const checkGameOver = (currentPatients, currentDeaths) => {
@@ -530,8 +575,7 @@
                 const failure = checkGameOver(patients, deaths);
                 if (failure) { setGameState('gameover'); setModalContent(failure); return; }
                 setTurn(t => t + 1);
-                const newTime = simTime + 15; 
-                setSimTime(newTime);
+                const newTime = simTime + 15; setSimTime(newTime);
                 setRoleStates(prev => prev.map(r => ({ ...r, currentAp: r.ap, disabled: false })));
                 triggerEvent();
                 spawnPatients(Math.floor(Math.random() * 3) + 1, newTime);
@@ -637,23 +681,19 @@
                             <h1 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">INCIDENT<span className="text-blue-600">COMMAND</span></h1>
                             <p className="text-slate-500 mb-6 font-medium">WMEBEM Digital Simulation</p>
                             <div className="mb-6 space-y-4 text-left">
-                                {hasSave && <button onClick={loadGame} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold mb-4">Resume Simulation</button>}
-                                
+                                {hasSave && <button type="button" onClick={loadGame} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold mb-4 cursor-pointer">Resume Simulation</button>}
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide text-center">Scenario Selection</label>
                                     <div className="grid grid-cols-2 gap-2">
                                         {Object.entries(SCENARIOS).map(([key, val]) => (
-                                            <button key={key} onClick={() => setSelectedScenario(key)} className={`p-2 rounded border text-xs font-bold ${selectedScenario === key ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-                                                {val.name}
-                                            </button>
+                                            <button type="button" key={key} onClick={() => setSelectedScenario(key)} className={`p-2 rounded border text-xs font-bold cursor-pointer ${selectedScenario === key ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>{val.name}</button>
                                         ))}
                                     </div>
                                     <p className="text-xs text-gray-500 mt-1 text-center italic">{SCENARIOS[selectedScenario].desc}</p>
                                 </div>
-
                                 <div className="border-t pt-4">
                                     <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide text-center">Staff & Players</label>
-                                    <div className="flex flex-wrap justify-center gap-2 mb-2">{[1, 2, 3, 4, 5, 6, 7, 8].map(num => ( <button key={num} onClick={() => setPlayerCount(num)} className={`w-8 h-8 rounded font-bold text-sm transition-all ${playerCount === num ? 'bg-blue-600 text-white scale-110 shadow' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{num}</button> ))}</div>
+                                    <div className="flex flex-wrap justify-center gap-2 mb-2">{[1, 2, 3, 4, 5, 6, 7, 8].map(num => ( <button type="button" key={num} onClick={() => setPlayerCount(num)} className={`w-8 h-8 rounded font-bold text-sm transition-all cursor-pointer ${playerCount === num ? 'bg-blue-600 text-white scale-110 shadow' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{num}</button> ))}</div>
                                     <div className="space-y-2">
                                         <Counter label="Senior Docs" value={staffCounts.senior} onChange={(v)=>setStaffCounts({...staffCounts, senior: v})} min={1} max={3} />
                                         <Counter label="Residents" value={staffCounts.resident} onChange={(v)=>setStaffCounts({...staffCounts, resident: v})} min={1} max={6} />
@@ -661,7 +701,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <button onClick={startGame} className="w-full py-4 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all transform active:scale-95">Initialize New Incident</button>
+                            <button type="button" onClick={startGame} className="w-full py-4 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all transform active:scale-95 cursor-pointer">Initialise New Incident</button>
                             <div className="mt-4 text-xs text-slate-400">Version 6.6 • WMEBEM</div>
                         </div>
                     </div>
@@ -676,36 +716,36 @@
                         <div className="flex items-center gap-3"><img src={LOGO_URL} className="logo-h" /><span className="font-bold text-sm hidden sm:inline">Turn {turn} ({formatTime(simTime)})</span></div>
                         <div className="flex items-center gap-4 font-bold text-sm">
                              <div className="flex gap-2 items-center">
-                                 <button onClick={() => setIsMuted(!isMuted)} className="text-slate-500 hover:text-slate-800 p-1">{isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
-                                 <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="lg:hidden text-xs font-bold text-slate-600 hover:text-slate-800 flex items-center gap-1 px-2 py-1 rounded bg-slate-100"><Menu size={16} /> Menu</button>
-                                 <button onClick={() => setModalContent('guide')} className="hidden lg:flex text-xs font-bold text-blue-600 hover:text-blue-800 items-center gap-1 px-3 py-1 rounded hover:bg-blue-50 transition-colors"><BookOpen size={16} /> Guide</button>
-                                 <button onClick={() => setModalContent('roles')} className="hidden lg:flex text-xs font-bold text-purple-600 hover:text-purple-800 items-center gap-1 px-3 py-1 rounded hover:bg-purple-50 transition-colors"><BadgeInfo size={16} /> Roles</button>
+                                 <button type="button" onClick={() => setIsMuted(!isMuted)} className="text-slate-500 hover:text-slate-800 p-1 cursor-pointer">{isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
+                                 <button type="button" onClick={() => setSidebarOpen(!isSidebarOpen)} className="lg:hidden text-xs font-bold text-slate-600 hover:text-slate-800 flex items-center gap-1 px-2 py-1 rounded bg-slate-100 cursor-pointer"><Menu size={16} /> Menu</button>
+                                 <button type="button" onClick={() => setModalContent('guide')} className="hidden lg:flex text-xs font-bold text-blue-600 hover:text-blue-800 items-center gap-1 px-3 py-1 rounded hover:bg-blue-50 transition-colors cursor-pointer"><BookOpen size={16} /> Guide</button>
+                                 <button type="button" onClick={() => setModalContent('roles')} className="hidden lg:flex text-xs font-bold text-purple-600 hover:text-purple-800 items-center gap-1 px-3 py-1 rounded hover:bg-purple-50 transition-colors cursor-pointer"><BadgeInfo size={16} /> Roles</button>
                              </div>
                             <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
-                            <button onClick={handleUndo} disabled={historyStack.length===0} className="flex items-center gap-1 px-3 py-1 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-xs font-bold"><RotateCcw size={14}/> <span className="hidden sm:inline">Undo</span></button>
+                            <button type="button" onClick={handleUndo} disabled={historyStack.length===0} className="flex items-center gap-1 px-3 py-1 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-xs font-bold cursor-pointer"><RotateCcw size={14}/> <span className="hidden sm:inline">Undo</span></button>
                             <div className="flex flex-col items-center leading-none mx-2"><span className="text-[10px] text-slate-400 uppercase">Score</span><span className="font-bold">{score}</span></div>
-                            <button onClick={nextTurn} className="bg-slate-800 text-white px-4 py-1.5 rounded text-xs hover:bg-slate-700 font-bold">Next</button>
+                            <button type="button" onClick={nextTurn} className="bg-slate-800 text-white px-4 py-1.5 rounded text-xs hover:bg-slate-700 font-bold cursor-pointer">Next</button>
                         </div>
                     </div>
 
                     <div className="flex flex-1 overflow-hidden relative">
                         <div className={`absolute inset-y-0 left-0 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 transition duration-200 ease-in-out w-64 bg-white border-r flex flex-col shrink-0 z-30 shadow-2xl lg:shadow-none`}>
-                            <div className="p-4 border-b bg-slate-50 flex justify-between items-center"><span className="font-black text-[10px] uppercase tracking-widest text-slate-400">Resources</span><button onClick={()=>setSidebarOpen(false)} className="lg:hidden text-slate-400"><X size={16}/></button></div>
+                            <div className="p-4 border-b bg-slate-50 flex justify-between items-center"><span className="font-black text-[10px] uppercase tracking-widest text-slate-400">Resources</span><button type="button" onClick={()=>setSidebarOpen(false)} className="lg:hidden text-slate-400 cursor-pointer"><X size={16}/></button></div>
                             <div className="p-4 border-b bg-slate-50 grid grid-cols-2 gap-2 text-center text-xs font-bold">
                                 <div className="bg-white border rounded p-1 shadow-sm"><Droplet size={14} className="mx-auto text-red-500 mb-1"/>{resources.blood}</div>
                                 <div className="bg-white border rounded p-1 shadow-sm"><Wind size={14} className="mx-auto text-emerald-500 mb-1"/>{resources.vents}</div>
                             </div>
                             <div className="p-3 border-b font-bold text-xs text-slate-400 uppercase tracking-widest flex justify-between items-center">
                                 <span>Staff Rostering</span>
-                                <div className="lg:hidden flex gap-2"><button onClick={() => setModalContent('guide')} className="text-blue-600"><BookOpen size={14}/></button><button onClick={() => setModalContent('roles')} className="text-purple-600"><BadgeInfo size={14}/></button></div>
+                                <div className="lg:hidden flex gap-2"><button type="button" onClick={() => setModalContent('guide')} className="text-blue-600 cursor-pointer"><BookOpen size={14}/></button><button type="button" onClick={() => setModalContent('roles')} className="text-purple-600 cursor-pointer"><BadgeInfo size={14}/></button></div>
                             </div>
                             <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                                {roleStates.map(r => { const RoleIcon = r.icon; return ( <button key={r.id} onClick={() => { setCurrentRoleId(r.id); if(window.innerWidth < 1024) setSidebarOpen(false); }} disabled={r.disabled} className={`w-full text-left px-3 py-2 rounded border-l-4 transition-all mb-1 group ${currentRoleId === r.id ? getActiveStyle(r.theme) + ' shadow-md' : getColorStyle(r.theme) + ' bg-white border-transparent'} ${r.disabled ? 'opacity-50 bg-slate-100' : ''}`}><div className="flex justify-between items-center"><div className="flex items-center gap-2"><div className={`p-1 rounded ${currentRoleId === r.id ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-white'}`}><RoleIcon size={16} strokeWidth={2.5} /></div><div><span className="font-bold text-xs block">{r.name}</span><span className="text-[10px] opacity-75">{r.disabled ? 'UNAVAILABLE' : r.actionText}</span></div></div><span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${r.currentAp === 0 ? 'bg-red-500 text-white' : 'bg-white/30'}`}>{r.currentAp}</span></div></button> )})}
+                                {roleStates.map(r => { const RoleIcon = r.icon; return ( <button type="button" key={r.id} onClick={() => { setCurrentRoleId(r.id); if(window.innerWidth < 1024) setSidebarOpen(false); }} disabled={r.disabled} className={`w-full text-left px-3 py-2 rounded border-l-4 transition-all mb-1 group cursor-pointer ${currentRoleId === r.id ? getActiveStyle(r.theme) + ' shadow-md' : getColorStyle(r.theme) + ' bg-white border-transparent'} ${r.disabled ? 'opacity-50 bg-slate-100' : ''}`}><div className="flex justify-between items-center"><div className="flex items-center gap-2"><div className={`p-1 rounded ${currentRoleId === r.id ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-white'}`}><RoleIcon size={16} strokeWidth={2.5} /></div><div><span className="font-bold text-xs block">{r.name}</span><span className="text-[10px] opacity-75">{r.disabled ? 'UNAVAILABLE' : r.actionText}</span></div></div><span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${r.currentAp === 0 ? 'bg-red-500 text-white' : 'bg-white/30'}`}>{r.currentAp}</span></div></button> )})}
                             </div>
                         </div>
 
                         <div className="flex-1 bg-slate-200 p-3 overflow-y-auto relative flex flex-col" onClick={() => setSelectedPatientId(null)}>
-                            <button onClick={()=>setSidebarOpen(true)} className="lg:hidden absolute top-3 left-3 z-20 bg-white p-2 rounded shadow"><Menu size={20}/></button>
+                            <button type="button" onClick={()=>setSidebarOpen(true)} className="lg:hidden absolute top-3 left-3 z-20 bg-white p-2 rounded shadow cursor-pointer"><Menu size={20}/></button>
                             {activeEvent && <div className="mb-3 bg-amber-50 border border-amber-200 p-3 rounded flex items-center gap-3 shadow-sm animate-bounce"><AlertTriangle className="text-amber-600"/><div className="text-xs"><span className="font-bold block text-amber-800">{activeEvent.title}</span>{activeEvent.desc} <span className="font-bold">({activeEvent.effect})</span></div></div>}
 
                             <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 flex-1 transition-all duration-300 ${selectedPatientId ? 'scale-[0.99]' : ''}`}>
@@ -716,7 +756,7 @@
                                 <div className="col-span-1 bg-gray-100/50 rounded-xl border border-gray-200/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Ops</div><div className="flex-1 grid grid-rows-3 gap-2"><div className="row-span-1 min-h-[80px]"><ZoneDisplay zone={ZONES[8]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="row-span-1 min-h-[80px]"><ZoneDisplay zone={ZONES[9]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="row-span-1 min-h-[80px]"><ZoneDisplay zone={ZONES[10]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div></div></div>
                             </div>
                             
-                            {/* Footer - Inside main content area to ensure visibility but pushed down */}
+                            {/* Footer */}
                             <div className="mt-4 border-t border-gray-300 pt-2 pb-24 lg:pb-2 text-[10px] text-gray-500 flex flex-wrap justify-between items-center gap-2">
                                 <div className="flex gap-4"><span>© 2025 WMEBEM. Licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">CC BY-NC-SA 4.0</a>.</span></div>
                                 <div className="flex gap-4"><a href="https://www.england.nhs.uk/ourwork/eprr/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">NHS England EPRR</a><span>•</span><a href="https://www.england.nhs.uk/publication/clinical-guidelines-for-major-incidents-and-mass-casualty-events/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">Clinical Guidelines</a></div>
