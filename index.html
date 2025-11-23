@@ -28,6 +28,18 @@
         .dead-bg { background-color: #e2e8f0; border-left: 5px solid #1e293b; }
         .neutral-bg { background-color: #f1f5f9; border-left: 5px solid #94a3b8; } 
         
+        /* Tutorial Highlight */
+        .tutorial-highlight { 
+            box-shadow: 0 0 0 4px #facc15, 0 0 20px #facc15; 
+            z-index: 50; 
+            position: relative;
+            animation: pulse-ring 2s infinite;
+        }
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0px rgba(250, 204, 21, 0.7); }
+            100% { box-shadow: 0 0 0 10px rgba(250, 204, 21, 0); }
+        }
+
         /* Animations */
         .hud-enter { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -54,7 +66,7 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
-        // --- AUDIO MANAGER (Robust Singleton) ---
+        // --- AUDIO MANAGER ---
         let audioCtx = null;
         const getAudioCtx = () => {
             if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
@@ -268,7 +280,7 @@
                     </div>
                     <div className="h-1 w-full bg-slate-100"><div className={`h-full transition-all duration-500 ${barColor}`} style={{ width: `${percent}%` }}></div></div>
                     <div className="p-2 flex-1 overflow-y-auto min-h-[80px]">
-                        {zPatients.map(p => ( <PatientCard key={p.uniqueId} patient={p} isSelected={selectedPatientId === p.uniqueId} onSelect={onSelect} onDragStart={(e, id) => e.dataTransfer.setData("patientId", id)} isTutorialTarget={isTutorialTarget && p.id === 'tutorial_patient'} /> ))}
+                        {zPatients.map(p => ( <PatientCard key={p.uniqueId} patient={p} isSelected={selectedPatientId === p.uniqueId} onSelect={onSelect} onDragStart={(e, id) => e.dataTransfer.setData("patientId", id)} isTutorialTarget={isTutorialTarget && p.uniqueId === 99999} /> ))}
                     </div>
                 </div>
             );
@@ -452,7 +464,7 @@
                 </div>
             );
         };
-
+        
         const Modal = ({ title, children, onClose }) => (
             <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4 backdrop-blur-sm animate-fade-in">
                 <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden modal-enter border border-gray-200 flex flex-col max-h-[90vh]">
@@ -707,7 +719,7 @@
                 setCurrentRoleId('bronze_cmd'); // Force start off target
                 
                 // One specific patient for tutorial
-                const tutPatient = createPatient(PATIENT_TEMPLATES.tutorial[0], "12:00", { id: 'tutorial_patient' });
+                const tutPatient = createPatient(PATIENT_TEMPLATES.tutorial[0], "12:00", { id: 99999 });
                 setPatients([tutPatient]);
                 
                 setGameState('playing');
