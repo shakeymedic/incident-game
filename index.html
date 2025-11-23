@@ -2,1600 +2,833 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WMEBEM Scenario Generator v7.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMEBEM Incident Command</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React & ReactDOM -->
-    <script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" crossorigin></script>
+    <!-- React and ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Chart.js for Graphs -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- jsPDF for Exports -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
     <style>
-        .animate-fadeIn { animation: fadeIn 0.5s ease-in-out; }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; user-select: none; }
+        .zone-card { transition: all 0.2s; }
+        .zone-card.drag-over { background-color: #f0f9ff; border-color: #0284c7; box-shadow: 0 0 0 2px #0284c7 inset; }
+        
+        /* NHS / WMEBEM Standard Colours */
+        .p1-bg { background-color: #fecaca; border-left: 4px solid #dc2626; } /* Red - Immediate */
+        .p2-bg { background-color: #fef3c7; border-left: 4px solid #d97706; } /* Yellow - Urgent */
+        .p3-bg { background-color: #d1fae5; border-left: 4px solid #059669; } /* Green - Delayed */
+        .dead-bg { background-color: #e2e8f0; border-left: 4px solid #1e293b; } /* Black/Grey - Expectant/Dead */
+        
+        .vital-red { color: #dc2626; font-weight: 900; animation: pulse 2s infinite; }
+        .vital-amber { color: #d97706; font-weight: bold; }
+        .vital-normal { color: #059669; }
 
-        /* Flash animation for deterioration */
-        .flash-red {
-            animation: flashRed 1.5s ease-in-out;
-        }
-        @keyframes flashRed {
-            0%, 100% { background-color: rgba(30, 41, 59, 1); } /* slate-800 */
-            50% { background-color: rgba(127, 29, 29, 0.5); } /* red-900/50 */
-        }
-        
-        /* Success flash */
-        .flash-green {
-            animation: flashGreen 1s ease-in-out;
-        }
-        @keyframes flashGreen {
-            0%, 100% { border-color: #334155; }
-            50% { border-color: #10b981; }
-        }
-        
-        /* Prevent layout shift on scrollbar appearance */
-        html {
-            overflow-y: scroll;
-            -webkit-tap-highlight-color: transparent;
-        }
-        body {
-            overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile */
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
         }
 
-        /* Progress bar animation for buttons */
-        @keyframes loadProgress {
-            from { width: 0%; }
-            to { width: 100%; }
-        }
-        .loading-bar {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            height: 100%;
-            background-color: rgba(16, 185, 129, 0.2); /* emerald-500 with opacity */
-            animation: loadProgress 2s linear forwards; /* 2s duration matches logic */
-            z-index: 0;
-        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .logo-h { height: 3rem; width: auto; }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 antialiased selection:bg-sky-500 selection:text-white">
+<body>
     <div id="root"></div>
 
     <script type="text/babel">
-    
-    // --- 1. HELPER FUNCTIONS & DATA ---
+        const { useState, useEffect, useRef } = React;
 
-    const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-    const getRandomFloat = (min, max, decimals) => parseFloat((Math.random() * (max - min) + min).toFixed(decimals));
-
-    // Vital Signs Ranges
-    const getBaseVitals = (age) => {
-        if (age < 1) return { hr: 145, rr: 45, bpSys: 75, bpDia: 45, temp: 37.0, bm: 4.5 }; // Neonate/Infant
-        if (age <= 2) return { hr: 125, rr: 30, bpSys: 90, bpDia: 55, temp: 37.0, bm: 5.0 }; // Toddler
-        if (age <= 5) return { hr: 110, rr: 25, bpSys: 95, bpDia: 60, temp: 37.0, bm: 5.0 }; // Pre-school
-        if (age <= 12) return { hr: 90, rr: 20, bpSys: 105, bpDia: 65, temp: 36.8, bm: 5.5 }; // School
-        if (age > 65) return { hr: 70, rr: 18, bpSys: 135, bpDia: 80, temp: 36.5, bm: 6.0 }; // Elderly (higher baseline BP)
-        return { hr: 75, rr: 16, bpSys: 120, bpDia: 75, temp: 36.8, bm: 5.8 }; // Adult
-    };
-
-    const estimateWeight = (age) => {
-        if (age === 0) return "3.5"; 
-        if (age < 1) return "4-9"; 
-        if (age >= 1 && age <= 10) return ((age + 4) * 2).toFixed(1); 
-        if (age > 10) return (age * 3).toFixed(1); 
-        return null; 
-    };
-
-    const generateVbg = (clinicalState = "normal") => {
-        let vbg = { pH: 7.40, pCO2: 5.3, HCO3: 24, BE: 0, Lac: 1.0, K: 4.0, Glu: 5.5 };
-        vbg.pH += getRandomFloat(-0.03, 0.03, 2);
+        // --- GAME CONSTANTS ---
+        const LOGO_URL = "https://iili.io/KGQOvkl.md.png";
         
-        switch (clinicalState) {
-            case "dka_severe": vbg = { pH: 6.95, pCO2: 2.5, HCO3: 5, BE: -24, Lac: 2.5, K: 5.4, Glu: 28.0 }; break;
-            case "septic_shock": vbg = { pH: 7.25, pCO2: 4.5, HCO3: 16, BE: -8, Lac: 6.5, K: 4.2, Glu: 4.0 }; break;
-            case "haemorrhagic_shock": vbg = { pH: 7.20, pCO2: 4.8, HCO3: 14, BE: -10, Lac: 8.0, K: 3.8, Glu: 9.0 }; break;
-            case "copd_retainer": vbg = { pH: 7.30, pCO2: 9.5, HCO3: 34, BE: 8, Lac: 1.2, K: 4.0, Glu: 6.0 }; break;
-            case "respiratory_acidosis_acute": vbg = { pH: 7.15, pCO2: 9.5, HCO3: 24, BE: 0, Lac: 1.5, K: 4.1, Glu: 6.2 }; break;
-            case "metabolic_acidosis_severe": vbg = { pH: 6.90, pCO2: 6.0, HCO3: 10, BE: -22, Lac: 12.0, K: 6.5, Glu: 6.0 }; break;
-            case "metabolic_alkalosis": vbg = { pH: 7.50, pCO2: 5.8, HCO3: 30, BE: 6, Lac: 1.0, K: 3.0, Glu: 5.5 }; break;
-            case "hyperkalemia": vbg = { pH: 7.35, pCO2: 5.0, HCO3: 22, BE: -2, Lac: 1.5, K: 7.5, Glu: 6.0 }; break;
-            default: break;
-        }
-        return vbg;
-    };
+        const PHASES = ['Receipt (0-4h)', 'Definitive Care (4-12h)', 'Recovery (12-48h)'];
+        
+        // --- EXPANDED ROLES (10 ROLES) ---
+        const ALL_ROLES = [
+            // COMMAND (Silver/Grey)
+            { id: 'silver', type: 'command', name: 'Silver Commander', ap: 4, desc: 'Strategy & Resource', ability: 'Request Mutual Aid (+3 Staff)', abilityCost: 2, actionText: 'Review / Command' },
+            { id: 'bronze', type: 'command', name: 'ED Consultant', ap: 5, desc: 'Triage & Flow', ability: 'Rapid Triage (Reveal All Intake)', abilityCost: 2, actionText: 'Clinical Review' },
+            
+            // NURSING (Blue)
+            { id: 'nurse_ic', type: 'nursing', name: 'Nurse in Charge', ap: 4, desc: 'Coordination', ability: 'Team Huddle (+1 AP to others)', abilityCost: 1, actionText: 'Coordinate Care' },
+            { id: 'nurse_triage', type: 'nursing', name: 'Triage Nurse', ap: 4, desc: 'Assessment', ability: 'Stream to Minors (Move P3 Free)', abilityCost: 1, actionText: 'Assess / Vitals' },
+            { id: 'nurse_resus', type: 'nursing', name: 'Resus Nurse', ap: 4, desc: 'Critical Care', ability: 'IV Access (Treat P1 +1 AP)', abilityCost: 0, actionText: 'Give Meds / Obs' },
+            { id: 'nurse_majors', type: 'nursing', name: 'Majors Nurse', ap: 4, desc: 'Ward Care', ability: 'Analgesia (Treat P2 +1 AP)', abilityCost: 0, actionText: 'Give Meds / Obs' },
+            
+            // MEDICAL (Green)
+            { id: 'resident', type: 'medical', name: 'ED Resident', ap: 4, desc: 'Treatment', ability: 'Fast Track (Instant Treat P3)', abilityCost: 2, actionText: 'Perform Procedure' },
+            
+            // SUPPORT (Purple)
+            { id: 'radiology', type: 'support', name: 'Radiology Lead', ap: 3, desc: 'Diagnostics', ability: 'Rapid Scan (Move to CT Free)', abilityCost: 1, actionText: 'Perform Scan' },
+            { id: 'theatre', type: 'support', name: 'Theatre Coord', ap: 3, desc: 'Surgical Flow', ability: 'Clear Theatre (Free ICU Move)', abilityCost: 1, actionText: 'Prep Theatre' },
+            
+            // LOGISTICS (Amber)
+            { id: 'bed_manager', type: 'logistics', name: 'Bed Manager', ap: 3, desc: 'Flow', ability: 'Force Discharge (Clear Ward Bed)', abilityCost: 1, actionText: 'Breach Protocol' }
+        ];
 
-    const HUMAN_FACTOR_CHALLENGES = [
-      { id: 'hf0', type: 'Standard Simulation', description: 'Manage effectively.' },
-      { id: 'hf1', type: 'Blindfolded Lead', description: 'Leader blindfolded. Tests closed-loop comms.' },
-      { id: 'hf2', type: 'Silent Team', description: 'Only leader speaks.' },
-      { id: 'hf3', type: 'New Junior', description: 'Junior member needs explicit instructions.' },
-      { id: 'hf4', type: 'Missing Kit', description: 'Crucial equipment missing.' },
-      { id: 'hf5', type: 'Distracted Senior', description: 'Consultant on phone, dismissive.' },
-    ];
+        const ZONES = [
+            { id: 'amb', name: 'Ambulance Bay', capacity: 12, type: 'intake' },
+            { id: 'triage', name: 'Triage Lane', capacity: 10, type: 'process' },
+            { id: 'resus', name: 'Resus (P1)', capacity: 4, type: 'clinical' },
+            { id: 'majors', name: 'Majors (P2)', capacity: 10, type: 'clinical' },
+            { id: 'minors', name: 'Minors (P3)', capacity: 15, type: 'clinical' },
+            { id: 'ct', name: 'CT Scanner', capacity: 1, type: 'diagnostic' },
+            { id: 'theatre', name: 'Theatres', capacity: 2, type: 'treatment' },
+            { id: 'icu', name: 'ICU/HDU', capacity: 6, type: 'ward' },
+            { id: 'ward', name: 'Wards', capacity: 30, type: 'ward' },
+            { id: 'morgue', name: 'Mortuary', capacity: 999, type: 'exit' },
+            { id: 'discharged', name: 'Discharged', capacity: 999, type: 'exit' }
+        ];
 
-    const INTERVENTIONS = {
-        'Oxygen': { label: 'High Flow O2', effect: { SpO2: 5 }, category: 'Airway', log: 'High flow oxygen applied.' },
-        'Nebs': { label: 'Nebulisers', effect: { HR: 10, RR: -2, SpO2: 2 }, category: 'Airway', log: 'Nebulisers administered.' },
-        'Needle': { label: 'Needle Decompression', effect: { SpO2: 10, BP: 10, RR: -5 }, category: 'Airway', log: 'Needle thoracocentesis performed.' },
-        'Obs': { label: 'Apply Monitoring', effect: {}, category: 'Circulation', log: 'Full monitoring applied (ECG, SpO2, BP).' },
-        'IV Access': { label: 'IV/IO Access', effect: {}, category: 'Circulation', log: 'IV/IO access secured.' },
-        'Fluids': { label: 'Fluid Bolus', effect: { BP: 5, HR: -2 }, category: 'Circulation', log: 'Fluid bolus given.' },
-        'Blood': { label: 'Blood Tx', effect: { BP: 10, HR: -5 }, category: 'Circulation', log: 'Blood products transfused.' },
-        'Analgesia': { label: 'Analgesia', effect: { HR: -5, RR: -2 }, category: 'Drugs', log: 'Analgesia administered.' },
-        'Antibiotics': { label: 'Antibiotics', effect: {}, category: 'Drugs', log: 'IV Antibiotics administered.' },
-        'Adrenaline': { label: 'Adrenaline', effect: { HR: 20, BP: 10, RR: -2 }, category: 'Drugs', log: 'Adrenaline administered.' },
-        'Benzos': { label: 'Benzodiazepines', effect: { HR: -10, RR: -2, gcs: -1 }, category: 'Drugs', log: 'Benzodiazepines administered.' },
-        'Dexamethasone': { label: 'Steroids', effect: {}, category: 'Drugs', log: 'Steroids administered.' },
-        'Magnesium': { label: 'Magnesium', effect: { BP: -5 }, category: 'Drugs', log: 'IV Magnesium administered.' },
-        'Glucose': { label: 'Glucose', effect: { gcs: 2 }, category: 'Drugs', log: 'IV Glucose administered.' },
-        'Intubation': { label: 'RSI / Intubation', effect: { SpO2: 100, RR: -10 }, category: 'Procedures', log: 'Patient Intubated and Ventilated.' },
-        'CPR': { label: 'CPR', effect: {}, category: 'Procedures', log: 'CPR in progress.' },
-        'Naloxone': { label: 'Naloxone', effect: { RR: 5, gcs: 3 }, category: 'Drugs', log: 'Naloxone administered.' },
-        'Calcium': { label: 'Calcium', effect: { BP: 2 }, category: 'Drugs', log: 'Calcium Gluconate given.' },
-        'Insulin': { label: 'Insulin/Dextrose', effect: {}, category: 'Drugs', log: 'Insulin/Dextrose infusion started.' },
-        'TXA': { label: 'TXA', effect: {}, category: 'Drugs', log: 'TXA administered.' },
-        'Surgery': { label: 'Surgical Consult', effect: {}, category: 'Procedures', log: 'Surgeons contacted urgently.' }
-    };
+        // --- PATIENT DATA GENERATORS ---
+        const NAMES = ["Smith", "Jones", "Taylor", "Brown", "Williams", "Wilson", "Johnson", "Davies", "Robinson", "Wright", "Thompson", "Evans", "Walker", "White", "Roberts", "Green", "Hall", "Wood", "Harris", "Martin"];
+        const FIRST_NAMES = ["James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph", "Thomas", "Charles", "Mary", "Patricia", "Jennifer", "Linda", "Elizabeth", "Barbara", "Susan", "Jessica", "Sarah", "Karen"];
 
-    // === SCENARIO DATABASE ===
-    // Categories: Medical, Trauma, Toxicology, Psychiatry, Obstetrics
-    // Ages: Paediatric, Adult, Elderly
-    
-    const ALL_SCENARIOS = [
-      // ============================================================
-      // OBSTETRICS (16-40 yrs)
-      // ============================================================
-      {
-        id: 'OB001', title: 'Severe Pre-Eclampsia', category: 'Obstetrics', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(16, 40),
-        patientProfileTemplate: "A {age}-year-old female, 34 weeks pregnant. Headache and visual disturbance.",
-        presentingComplaint: 'Headache, Hypertension.',
-        scenarioDetails: ['Brisk reflexes.', 'Clonus present.', 'Proteinuria +++.'],
-        vitalsMod: { hr: 90, bpSys: 170, bpDia: 115, spO2: 98, rr: 18, gcs: 15 },
-        deterioration: { active: true, rate: 0.05, type: 'neuro' }, // Risk of seizure
-        stabilisers: ['Magnesium', 'Labetalol' /* Not in list but generic anti-HTN */],
-        vbgClinicalState: "normal",
-        learningLinks: [{ label: "RCOG: Pre-eclampsia", url: "https://www.rcog.org.uk/" }]
-      },
-      {
-        id: 'OB002', title: 'Eclampsia', category: 'Obstetrics', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(16, 40),
-        patientProfileTemplate: "A {age}-year-old female, 38 weeks pregnant. Seizing in waiting room.",
-        presentingComplaint: 'Seizure.',
-        scenarioDetails: ['Tonic-clonic activity.', 'Airway compromised.', 'Hypertensive.'],
-        vitalsMod: { hr: 130, bpSys: 180, bpDia: 110, spO2: 88, rr: 24, gcs: 3 },
-        deterioration: { active: true, rate: 0.1, type: 'neuro' },
-        stabilisers: ['Magnesium', 'Oxygen', 'Intubation'],
-        vbgClinicalState: "normal",
-        learningLinks: [{ label: "RCOG: Eclampsia", url: "https://www.rcog.org.uk/" }]
-      },
-      {
-        id: 'OB003', title: 'Post-Partum Haemorrhage', category: 'Obstetrics', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(16, 40),
-        patientProfileTemplate: "A {age}-year-old female. Home birth 2 hours ago. Continuous bleeding.",
-        presentingComplaint: 'PV Bleeding, Collapse.',
-        scenarioDetails: ['Uterus boggy.', 'Pale and clammy.', 'EBL > 1500ml.'],
-        vitalsMod: { hr: 140, bpSys: 70, bpDia: 30, spO2: 94, rr: 28, gcs: 13 },
-        deterioration: { active: true, rate: 0.2, type: 'shock' },
-        stabilisers: ['Blood', 'TXA', 'Fluids', 'Surgery'],
-        vbgClinicalState: "haemorrhagic_shock",
-        learningLinks: [{ label: "RCOG: PPH", url: "https://www.rcog.org.uk/" }]
-      },
-      {
-        id: 'OB004', title: 'Cord Prolapse', category: 'Obstetrics', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(16, 40),
-        patientProfileTemplate: "A {age}-year-old female, 39 weeks. Waters broke, 'something came down'.",
-        presentingComplaint: 'Cord visible.',
-        scenarioDetails: ['Cord palpable/visible at introitus.', 'Pulsating cord.', 'Fetal bradycardia on Doppler.'],
-        vitalsMod: { hr: 110, bpSys: 120, bpDia: 70, spO2: 99, rr: 20, gcs: 15 },
-        deterioration: { active: false, rate: 0 },
-        stabilisers: ['Surgery'], // C-Section
-        vbgClinicalState: "normal",
-        learningLinks: [{ label: "RCOG: Cord Prolapse", url: "https://www.rcog.org.uk/" }]
-      },
-      {
-        id: 'OB005', title: 'Maternal Sepsis (Chorio)', category: 'Obstetrics', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(16, 40),
-        patientProfileTemplate: "A {age}-year-old female, 30 weeks. PROM 2 days ago. Fever.",
-        presentingComplaint: 'Fever, Abdominal pain.',
-        scenarioDetails: ['Uterine tenderness.', 'Foul smelling liquor.', 'Fetal tachycardia.'],
-        vitalsMod: { hr: 125, bpSys: 90, bpDia: 50, spO2: 95, rr: 24, temp: 39.2 },
-        deterioration: { active: true, rate: 0.1, type: 'sepsis' },
-        stabilisers: ['Antibiotics', 'Fluids', 'Surgery'],
-        vbgClinicalState: "septic_shock",
-        learningLinks: [{ label: "RCOG: Sepsis in Pregnancy", url: "https://www.rcog.org.uk/" }]
-      },
-      {
-        id: 'OB006', title: 'Amniotic Fluid Embolus', category: 'Obstetrics', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(16, 40),
-        patientProfileTemplate: "A {age}-year-old female. Active labour. Sudden collapse and hypoxia.",
-        presentingComplaint: 'Cardiac Arrest/Peri-arrest.',
-        scenarioDetails: ['Profound hypoxia.', 'Cardiovascular collapse.', 'Coagulopathy developing.'],
-        vitalsMod: { hr: 150, bpSys: 60, bpDia: 30, spO2: 70, rr: 40, gcs: 8 },
-        deterioration: { active: true, rate: 0.2, type: 'arrest' },
-        stabilisers: ['CPR', 'Intubation', 'Blood'],
-        vbgClinicalState: "metabolic_acidosis_severe",
-        learningLinks: [{ label: "RCOG: AFE", url: "https://www.rcog.org.uk/" }]
-      },
-      {
-        id: 'OB007', title: 'Placental Abruption', category: 'Obstetrics', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(16, 40),
-        patientProfileTemplate: "A {age}-year-old female, 32 weeks. Severe constant abdominal pain.",
-        presentingComplaint: 'Abdominal pain, Woody uterus.',
-        scenarioDetails: ['Uterus hard (woody).', 'Dark PV blood.', 'Mother shocked out of proportion to visible loss.'],
-        vitalsMod: { hr: 130, bpSys: 85, bpDia: 45, spO2: 96, rr: 22, gcs: 15 },
-        deterioration: { active: true, rate: 0.1, type: 'shock' },
-        stabilisers: ['Blood', 'Surgery'],
-        vbgClinicalState: "haemorrhagic_shock",
-        learningLinks: [{ label: "RCOG: Antepartum Haemorrhage", url: "https://www.rcog.org.uk/" }]
-      },
-      {
-        id: 'OB008', title: 'Ruptured Ectopic', category: 'Obstetrics', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(16, 40),
-        patientProfileTemplate: "A {age}-year-old female. Unknown pregnancy. Sudden RIF pain and collapse.",
-        presentingComplaint: 'Collapse, Abdominal pain.',
-        scenarioDetails: ['Positive pregnancy test.', 'Shoulder tip pain.', 'Peritonitic.'],
-        vitalsMod: { hr: 140, bpSys: 70, bpDia: 40, spO2: 94, rr: 26, gcs: 12 },
-        deterioration: { active: true, rate: 0.2, type: 'shock' },
-        stabilisers: ['Blood', 'Fluids', 'Surgery'],
-        vbgClinicalState: "haemorrhagic_shock",
-        learningLinks: [{ label: "NICE NG126: Ectopic Pregnancy", url: "https://www.nice.org.uk/" }]
-      },
-
-      // ============================================================
-      // ELDERLY / GEM (Age > 65)
-      // ============================================================
-      {
-        id: 'EL001', title: 'Ruptured AAA', category: 'Medical', ageRange: 'Elderly',
-        ageGenerator: () => getRandomInt(65, 90),
-        patientProfileTemplate: "A {age}-year-old male. Sudden onset tearing back pain and collapse.",
-        presentingComplaint: 'Back pain, Syncope.',
-        scenarioDetails: ['Pulsatile abdominal mass.', 'Mottled legs.', 'Hypotensive.'],
-        vitalsMod: { hr: 110, bpSys: 70, bpDia: 40, spO2: 94, rr: 24, gcs: 13 }, // Beta blocked HR?
-        deterioration: { active: true, rate: 0.2, type: 'shock' },
-        stabilisers: ['Blood', 'Surgery'], // Permissive hypotension
-        vbgClinicalState: "haemorrhagic_shock",
-        learningLinks: [{ label: "NICE NG156: AAA", url: "https://www.nice.org.uk/" }]
-      },
-      {
-        id: 'EL002', title: 'Severe Hypothermia', category: 'Medical', ageRange: 'Elderly',
-        ageGenerator: () => getRandomInt(75, 95),
-        patientProfileTemplate: "A {age}-year-old found on floor by carers. Down for >12 hours.",
-        presentingComplaint: 'Confusion, Cold to touch.',
-        scenarioDetails: ['Core temp unrecordable initially.', 'Bradycardia (Osborn waves).', 'Confusion.'],
-        vitalsMod: { hr: 40, bpSys: 80, bpDia: 40, spO2: 90, rr: 8, temp: 29.0, gcs: 10 },
-        deterioration: { active: true, rate: 0.05, type: 'cardiac' }, // VF risk
-        stabilisers: ['Fluids' /* Warmed */, 'Oxygen'],
-        vbgClinicalState: "metabolic_acidosis_severe",
-        ecg: { type: "Bradycardia", findings: "Rate 40. J waves present." },
-        learningLinks: [{ label: "RCEM: Hypothermia", url: "https://www.rcem.ac.uk/" }]
-      },
-      {
-        id: 'EL003', title: 'NOF Fracture & Delirium', category: 'Trauma', ageRange: 'Elderly',
-        ageGenerator: () => getRandomInt(75, 95),
-        patientProfileTemplate: "A {age}-year-old. Fall in care home. Confused and aggressive.",
-        presentingComplaint: 'Hip pain, Confusion.',
-        scenarioDetails: ['Shortened rotated leg.', 'PINCH ME causes of delirium.', 'Dehydrated.'],
-        vitalsMod: { hr: 110, bpSys: 100, bpDia: 60, spO2: 94, rr: 20, temp: 37.8, gcs: 13 },
-        deterioration: { active: true, rate: 0.02, type: 'sepsis' }, // Aspiration/UTI underlying
-        stabilisers: ['Analgesia', 'Fluids'],
-        vbgClinicalState: "normal",
-        learningLinks: [{ label: "NICE CG124: Hip Fracture", url: "https://www.nice.org.uk/" }]
-      },
-      {
-        id: 'EL004', title: 'Ischaemic Bowel', category: 'Medical', ageRange: 'Elderly',
-        ageGenerator: () => getRandomInt(70, 90),
-        patientProfileTemplate: "A {age}-year-old with AF. Severe generalised abdo pain.",
-        presentingComplaint: 'Pain out of proportion to exam.',
-        scenarioDetails: ['Soft abdomen initially.', 'Lactate rising fast.', 'History of AF.'],
-        vitalsMod: { hr: 130, bpSys: 95, bpDia: 60, spO2: 94, rr: 26, gcs: 15 },
-        deterioration: { active: true, rate: 0.1, type: 'metabolic' },
-        stabilisers: ['Fluids', 'Antibiotics', 'Surgery'],
-        vbgClinicalState: "metabolic_acidosis_severe", // High lactate
-        learningLinks: [{ label: "RCEM: Acute Mesenteric Ischaemia", url: "https://www.rcem.ac.uk/" }]
-      },
-      {
-        id: 'EL005', title: 'Digoxin Toxicity', category: 'Toxicology', ageRange: 'Elderly',
-        ageGenerator: () => getRandomInt(70, 90),
-        patientProfileTemplate: "A {age}-year-old. Confusion, vomiting and 'yellow vision'.",
-        presentingComplaint: 'Nausea, Palpitations.',
-        scenarioDetails: ['Bradycardia.', 'Renal failure (AKI).', 'Reverse tick ECG.'],
-        vitalsMod: { hr: 45, bpSys: 90, bpDia: 50, spO2: 96, rr: 18, gcs: 14 },
-        deterioration: { active: true, rate: 0.1, type: 'cardiac' },
-        stabilisers: ['Atropine', 'Fab fragments' /* Digibind */],
-        vbgClinicalState: "hyperkalemia",
-        ecg: { type: "Bradycardia", findings: "Reverse tick signs. Rate 45." },
-        learningLinks: [{ label: "Toxbase: Digoxin", url: "https://www.toxbase.org/" }]
-      },
-      {
-        id: 'EL006', title: 'Chronic Subdural Haematoma', category: 'Trauma', ageRange: 'Elderly',
-        ageGenerator: () => getRandomInt(75, 95),
-        patientProfileTemplate: "A {age}-year-old. Gradual confusion and ataxia over 2 weeks.",
-        presentingComplaint: 'Falls, Confusion.',
-        scenarioDetails: ['History of fall 3 weeks ago.', 'On Warfarin/DOAC.', 'Fluctuating GCS.'],
-        vitalsMod: { hr: 70, bpSys: 150, bpDia: 80, spO2: 96, rr: 16, gcs: 12 },
-        deterioration: { active: true, rate: 0.05, type: 'neuro' },
-        stabilisers: ['Reversal (Beriplex)', 'Surgery'],
-        vbgClinicalState: "normal",
-        ct: { findings: "Large crescentic hypodense collection with midline shift." },
-        learningLinks: [{ label: "NICE CG176: Head Injury", url: "https://www.nice.org.uk/" }]
-      },
-
-      // ============================================================
-      // ADULT MEDICAL (Expanded)
-      // ============================================================
-      {
-        id: 'AM017', title: 'Massive PE', category: 'Medical', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(30, 70),
-        patientProfileTemplate: "A {age}-year-old female. Recent surgery. Sudden collapse.",
-        presentingComplaint: 'Collapse, SOB.',
-        scenarioDetails: ['Cyanosed.', 'Engorged neck veins.', 'Hypotensive.'],
-        vitalsMod: { hr: 140, bpSys: 70, bpDia: 40, spO2: 80, rr: 40, gcs: 10 },
-        deterioration: { active: true, rate: 0.15, type: 'cardiac' }, // Obstructive shock
-        stabilisers: ['Thrombolysis', 'Oxygen', 'Fluids'],
-        vbgClinicalState: "normal", // Or respiratory alkalosis
-        ecg: { type: "Sinus Tach", findings: "S1Q3T3. RBBB." },
-        learningLinks: [{ label: "NICE NG158: VTE", url: "https://www.nice.org.uk/" }]
-      },
-      {
-        id: 'AM018', title: 'Severe Hyperkalemia', category: 'Medical', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(40, 80),
-        patientProfileTemplate: "A {age}-year-old with CKD. Missed dialysis.",
-        presentingComplaint: 'Weakness, Palpitations.',
-        scenarioDetails: ['Bradycardia or Bizarre tachycardia.', 'Muscle weakness.', 'K+ 8.5.'],
-        vitalsMod: { hr: 40, bpSys: 100, bpDia: 60, spO2: 96, rr: 18, gcs: 15 },
-        deterioration: { active: true, rate: 0.1, type: 'cardiac' },
-        stabilisers: ['Calcium', 'Insulin', 'Salbutamol'],
-        vbgClinicalState: "hyperkalemia",
-        ecg: { type: "Sine Wave", findings: "Broad QRS. Absent P waves. Sine wave pattern." },
-        learningLinks: [{ label: "RCEM: Hyperkalaemia", url: "https://www.rcem.ac.uk/" }]
-      },
-      {
-        id: 'AM019', title: 'Thyroid Storm', category: 'Medical', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(20, 50),
-        patientProfileTemplate: "A {age}-year-old female. Graves disease. Agitated and delirious.",
-        presentingComplaint: 'Confusion, Palpitations.',
-        scenarioDetails: ['Hyperpyrexia.', 'Fast AF.', 'Tremor.', 'Goitre.'],
-        vitalsMod: { hr: 160, bpSys: 160, bpDia: 80, spO2: 96, rr: 30, temp: 40.0, gcs: 11 },
-        deterioration: { active: true, rate: 0.1, type: 'cardiac' },
-        stabilisers: ['Beta Blockers', 'Fluids', 'Cooling'],
-        vbgClinicalState: "normal",
-        ecg: { type: "AF Fast", findings: "AF rate 160." },
-        learningLinks: [{ label: "Society for Endocrinology: Thyroid Storm", url: "https://www.endocrinology.org/" }]
-      },
-      {
-        id: 'AM020', title: 'Addisonian Crisis', category: 'Medical', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(30, 60),
-        patientProfileTemplate: "A {age}-year-old. Known Addison's. Vomiting for 2 days.",
-        presentingComplaint: 'Collapse, Vomiting.',
-        scenarioDetails: ['Hyperpigmentation.', 'Profound hypotension.', 'Hypoglycaemia.'],
-        vitalsMod: { hr: 120, bpSys: 70, bpDia: 40, spO2: 96, rr: 22, gcs: 13, bm: 2.8 },
-        deterioration: { active: true, rate: 0.1, type: 'shock' },
-        stabilisers: ['Dexamethasone' /* Hydrocortisone */, 'Fluids', 'Glucose'],
-        vbgClinicalState: "hyperkalemia", // Hyponatremia + Hyperkalemia
-        learningLinks: [{ label: "Society for Endocrinology: Adrenal Crisis", url: "https://www.endocrinology.org/" }]
-      },
-      {
-        id: 'AM021', title: 'Upper GI Bleed (Variceal)', category: 'Medical', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(40, 65),
-        patientProfileTemplate: "A {age}-year-old alcoholic. Vomiting large amounts of fresh blood.",
-        presentingComplaint: 'Haematemesis.',
-        scenarioDetails: ['Stigmata of liver disease.', 'Ascites.', 'Haemodynamically unstable.'],
-        vitalsMod: { hr: 130, bpSys: 80, bpDia: 40, spO2: 94, rr: 24, gcs: 14 },
-        deterioration: { active: true, rate: 0.15, type: 'shock' },
-        stabilisers: ['Blood', 'TXA', 'Terlipressin' /* Not in list */],
-        vbgClinicalState: "haemorrhagic_shock",
-        learningLinks: [{ label: "NICE CG141: Acute Upper GI Bleed", url: "https://www.nice.org.uk/" }]
-      },
-      {
-        id: 'AM022', title: 'Acute Ischaemic Stroke', category: 'Medical', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(50, 80),
-        patientProfileTemplate: "A {age}-year-old. Sudden onset R sided weakness 45 mins ago.",
-        presentingComplaint: 'Stroke symptoms.',
-        scenarioDetails: ['FAST positive.', 'AF on ECG.', 'Thrombolysis candidate (<4.5hr).'],
-        vitalsMod: { hr: 90, bpSys: 160, bpDia: 95, spO2: 96, rr: 16, gcs: 14 },
-        deterioration: { active: true, rate: 0.02, type: 'neuro' },
-        stabilisers: ['Thrombolysis'], // If available
-        vbgClinicalState: "normal",
-        ct: { findings: "No bleed. Dense MCA sign." },
-        learningLinks: [{ label: "NICE NG128: Stroke", url: "https://www.nice.org.uk/" }]
-      },
-      {
-        id: 'AM023', title: 'Meningococcal Sepsis', category: 'Medical', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(18, 30),
-        patientProfileTemplate: "A {age}-year-old student. Headache, fever, rapid deterioration.",
-        presentingComplaint: 'Fever, Rash.',
-        scenarioDetails: ['Non-blanching purpuric rash.', 'Neck stiffness.', 'Septic shock.'],
-        vitalsMod: { hr: 140, bpSys: 80, bpDia: 40, spO2: 92, rr: 35, temp: 40.1, gcs: 12 },
-        deterioration: { active: true, rate: 0.2, type: 'sepsis' },
-        stabilisers: ['Antibiotics', 'Fluids', 'Oxygen'],
-        vbgClinicalState: "septic_shock",
-        learningLinks: [{ label: "NICE NG51: Sepsis", url: "https://www.nice.org.uk/" }]
-      },
-      {
-        id: 'AM024', title: 'Boerhaave\'s Syndrome', category: 'Medical', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(30, 60),
-        patientProfileTemplate: "A {age}-year-old. Severe chest pain after forceful vomiting.",
-        presentingComplaint: 'Chest pain.',
-        scenarioDetails: ['Surgical emphysema (neck crepitus).', 'Shocked.', 'Rigid abdomen.'],
-        vitalsMod: { hr: 130, bpSys: 90, bpDia: 50, spO2: 92, rr: 30, temp: 38.5 },
-        deterioration: { active: true, rate: 0.1, type: 'sepsis' }, // Mediastinitis
-        stabilisers: ['Fluids', 'Antibiotics', 'Surgery'],
-        vbgClinicalState: "septic_shock",
-        chestXray: { findings: "Pneumomediastinum. Pleural effusion." },
-        learningLinks: [{ label: "RCEM: Oesophageal Rupture", url: "https://www.rcem.ac.uk/" }]
-      },
-
-      // ============================================================
-      // ADULT TRAUMA (Expanded)
-      // ============================================================
-      {
-        id: 'AT006', title: 'Tension Pneumothorax', category: 'Trauma', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(20, 50),
-        patientProfileTemplate: "A {age}-year-old male. Stabbed in chest.",
-        presentingComplaint: 'Respiratory Distress.',
-        scenarioDetails: ['Tracheal deviation.', 'Absent breath sounds.', 'Distended neck veins.'],
-        vitalsMod: { hr: 140, bpSys: 70, bpDia: 40, spO2: 80, rr: 35, gcs: 12 },
-        deterioration: { active: true, rate: 0.2, type: 'arrest' },
-        stabilisers: ['Needle', 'Oxygen'],
-        vbgClinicalState: "normal",
-        chestXray: { findings: "Large pneumothorax. Mediastinal shift." },
-        learningLinks: [{ label: "ATLS Guidelines", url: "https://www.facs.org/quality-programs/trauma/atls" }]
-      },
-      {
-        id: 'AT007', title: 'Neurogenic Shock', category: 'Trauma', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(20, 60),
-        patientProfileTemplate: "A {age}-year-old rugby player. Collapsed scrum. Cannot feel legs.",
-        presentingComplaint: 'Paralysis.',
-        scenarioDetails: ['Hypotensive AND Bradycardic (Classic sign).', 'Warm peripheries (Vasodilation).'],
-        vitalsMod: { hr: 50, bpSys: 75, bpDia: 40, spO2: 96, rr: 14, gcs: 15 },
-        deterioration: { active: true, rate: 0.05, type: 'shock' },
-        stabilisers: ['Fluids', 'Atropine', 'C-Spine'],
-        vbgClinicalState: "normal",
-        learningLinks: [{ label: "NICE NG39: Spinal Injury", url: "https://www.nice.org.uk/" }]
-      },
-      {
-        id: 'AT008', title: 'Flail Chest', category: 'Trauma', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(30, 70),
-        patientProfileTemplate: "A {age}-year-old. Fall from ladder onto side.",
-        presentingComplaint: 'Chest pain, SOB.',
-        scenarioDetails: ['Paradoxical chest movement.', 'Severe pain.', 'Hypoxia from contusion.'],
-        vitalsMod: { hr: 110, bpSys: 130, bpDia: 80, spO2: 88, rr: 30, gcs: 15 },
-        deterioration: { active: true, rate: 0.1, type: 'respiratory' },
-        stabilisers: ['Analgesia', 'Oxygen', 'Intubation'],
-        vbgClinicalState: "respiratory_acidosis_acute",
-        chestXray: { findings: "Multiple rib fractures (segments)." },
-        learningLinks: [{ label: "NICE NG39: Thoracic Trauma", url: "https://www.nice.org.uk/" }]
-      },
-      {
-        id: 'AT009', title: 'Traumatic Amputation', category: 'Trauma', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(20, 50),
-        patientProfileTemplate: "A {age}-year-old industrial worker. Arm trapped in machinery.",
-        presentingComplaint: 'Amputation.',
-        scenarioDetails: ['Arm amputated above elbow.', 'Catastrophic haemorrhage.', 'Tourniquet applied?'],
-        vitalsMod: { hr: 150, bpSys: 60, bpDia: 30, spO2: 90, rr: 30, gcs: 10 },
-        deterioration: { active: true, rate: 0.2, type: 'shock' },
-        stabilisers: ['MHP', 'TXA', 'Surgery'],
-        vbgClinicalState: "haemorrhagic_shock",
-        learningLinks: [{ label: "NICE NG39: Major Trauma", url: "https://www.nice.org.uk/" }]
-      },
-      {
-        id: 'AT010', title: 'Open Book Pelvic Fracture', category: 'Trauma', ageRange: 'Adult',
-        ageGenerator: () => getRandomInt(20, 60),
-        patientProfileTemplate: "A {age}-year-old motorcyclist. Hit barrier at speed.",
-        presentingComplaint: 'Pelvic pain.',
-        scenarioDetails: ['Pelvis sprung open.', 'Haemodynamically unstable.', 'Perineal bruising.'],
-        vitalsMod: { hr: 140, bpSys: 70, bpDia: 40, spO2: 95, rr: 28, gcs: 13 },
-        deterioration: { active: true, rate: 0.15, type: 'shock' },
-        stabilisers: ['Binder', 'Blood', 'TXA'],
-        vbgClinicalState: "haemorrhagic_shock",
-        ct: { findings: "Diastasis of symphysis pubis >5cm." },
-        learningLinks: [{ label: "BOAST: Pelvic Fractures", url: "https://www.boa.ac.uk/" }]
-      },
-
-      // === PAEDIATRIC SCENARIOS (Retained and expanded) ===
-      {
-        id: 'PT001', title: 'Paracetamol Overdose (Intentional)', category: 'Toxicology', ageRange: 'Paediatric',
-        ageGenerator: () => getRandomInt(12, 17),
-        patientProfileTemplate: "A {age}-year-old. Took 20x 500mg Paracetamol 4 hours ago.",
-        presentingComplaint: 'Overdose, Nausea.',
-        scenarioDetails: ['Nausea and vomiting.', 'Abdominal pain.', 'Regrets action.'],
-        vitalsMod: { hr: 100, bpSys: 110, bpDia: 70, spO2: 98, rr: 18, gcs: 15 },
-        deterioration: { active: false, rate: 0 },
-        stabilisers: ['Fluids', 'NAC'],
-        vbgClinicalState: "normal",
-        learningLinks: [{ label: "Toxbase: Paracetamol", url: "https://www.toxbase.org/" }]
-      },
-      {
-        id: 'PT002', title: 'Iron Overdose (Accidental)', category: 'Toxicology', ageRange: 'Paediatric',
-        ageGenerator: () => getRandomInt(1, 4),
-        patientProfileTemplate: "A {age}-year-old. Found with empty bottle of mother\'s iron tablets.",
-        presentingComplaint: 'Vomiting (Haematemesis).',
-        scenarioDetails: ['Vomiting blood.', 'Lethargic.', 'Abdominal tenderness.'],
-        vitalsMod: { hr: 140, bpSys: 85, bpDia: 50, spO2: 96, rr: 30, gcs: 14 }, 
-        deterioration: { active: true, rate: 0.1, type: 'shock' },
-        stabilisers: ['Fluids'],
-        vbgClinicalState: "metabolic_acidosis_severe",
-        learningLinks: [{ label: "Toxbase: Iron", url: "https://www.toxbase.org/" }]
-      },
-      {
-        id: 'PT003', title: 'Laundry Pod Ingestion', category: 'Toxicology', ageRange: 'Paediatric',
-        ageGenerator: () => getRandomInt(1, 3),
-        patientProfileTemplate: "A {age}-year-old. Bit into a liquid laundry detergent pod.",
-        presentingComplaint: 'Drooling, Stridor, Vomiting.',
-        scenarioDetails: ['Profuse drooling.', 'Lip swelling.', 'Respiratory distress.'],
-        vitalsMod: { hr: 130, bpSys: 95, bpDia: 60, spO2: 92, rr: 35, gcs: 15 },
-        deterioration: { active: true, rate: 0.1, type: 'respiratory' },
-        stabilisers: ['Oxygen', 'Nebs'],
-        vbgClinicalState: "normal",
-        learningLinks: [{ label: "RCEM: Caustic Ingestion", url: "https://www.rcem.ac.uk/" }]
-      },
-      {
-        id: 'PT004', title: 'Cannabis Edible', category: 'Toxicology', ageRange: 'Paediatric',
-        ageGenerator: () => getRandomInt(3, 8),
-        patientProfileTemplate: "A {age}-year-old. Ate 'gummy bears' found in older sibling's room.",
-        presentingComplaint: 'Drowsiness, Ataxia.',
-        scenarioDetails: ['Very drowsy.', 'GCS 10.', 'Tachycardic.', 'Dilated pupils.'],
-        vitalsMod: { hr: 130, bpSys: 100, bpDia: 60, spO2: 96, rr: 14, gcs: 10 },
-        deterioration: { active: true, rate: 0.05, type: 'neuro' },
-        stabilisers: ['Observation'],
-        vbgClinicalState: "normal",
-        learningLinks: [{ label: "Toxbase: Cannabis", url: "https://www.toxbase.org/" }]
-      },
-      {
-        id: 'PT005', title: 'Alcohol Intoxication', category: 'Toxicology', ageRange: 'Paediatric',
-        ageGenerator: () => getRandomInt(11, 16),
-        patientProfileTemplate: "A {age}-year-old found unresponsive in park with Vodka bottle.",
-        presentingComplaint: 'Unconscious.',
-        scenarioDetails: ['Strong smell of ethanol.', 'Risk of hypothermia.', 'Vomiting risk.'],
-        vitalsMod: { hr: 90, bpSys: 100, bpDia: 60, spO2: 95, rr: 10, temp: 35.5, gcs: 9, bm: 3.2 }, 
-        deterioration: { active: true, rate: 0.05, type: 'metabolic' },
-        stabilisers: ['Glucose', 'Fluids'],
-        vbgClinicalState: "normal",
-        learningLinks: [{ label: "Toxbase: Ethanol", url: "https://www.toxbase.org/" }]
-      },
-      {
-        id: 'PT006', title: 'MDMA/Ecstasy', category: 'Toxicology', ageRange: 'Paediatric',
-        ageGenerator: () => getRandomInt(14, 17),
-        patientProfileTemplate: "A {age}-year-old taken pill at a party. Agitated and hot.",
-        presentingComplaint: 'Agitation, Hyperthermia.',
-        scenarioDetails: ['Sweating profusely.', 'Jaw clenching.', 'Hyper-reflexic.'],
-        vitalsMod: { hr: 150, bpSys: 160, bpDia: 90, spO2: 98, rr: 28, temp: 39.5, gcs: 14 },
-        deterioration: { active: true, rate: 0.1, type: 'metabolic' },
-        stabilisers: ['Benzos', 'Fluids'],
-        vbgClinicalState: "metabolic_acidosis_severe",
-        learningLinks: [{ label: "Toxbase: MDMA", url: "https://www.toxbase.org/" }]
-      },
-      {
-        id: 'PED001', title: 'Bronchiolitis (Severe)', category: 'Medical', ageRange: 'Paediatric',
-        ageGenerator: () => getRandomInt(0, 1), 
-        patientProfileTemplate: "A {age}-month-old infant. 3 days of coryza, now working hard.",
-        presentingComplaint: 'Respiratory Distress, poor feeding.',
-        scenarioDetails: ['Subcostal/Intercostal recession.', 'Tracheal tug.', 'Head bobbing.', 'Dry nappies.'],
-        vitalsMod: { hr: 170, bpSys: 85, bpDia: 50, spO2: 88, rr: 65, temp: 37.8, gcs: 13 },
-        deterioration: { active: true, rate: 0.08, type: 'respiratory' },
-        stabilisers: ['Oxygen', 'Fluids'], 
-        vbgClinicalState: "respiratory_acidosis_acute",
-        learningLinks: [{ label: "NICE NG9: Bronchiolitis in children", url: "https://www.nice.org.uk/guidance/ng9" }]
-      },
-      {
-        id: 'PED003', title: 'Paediatric Sepsis', category: 'Medical', ageRange: 'Paediatric',
-        ageGenerator: () => getRandomInt(0, 10),
-        patientProfileTemplate: "A {age}-year-old child. Lethargic, high fever, rash.",
-        presentingComplaint: 'Fever, Non-blanching rash.',
-        scenarioDetails: ['Purpuric rash on legs.', 'Cold peripheries.', 'Cap refill 4s.', 'Parents very worried.'],
-        vitalsMod: { hr: 160, bpSys: 75, bpDia: 40, spO2: 93, rr: 45, temp: 39.5, gcs: 13 }, 
-        deterioration: { active: true, rate: 0.1, type: 'shock' },
-        stabilisers: ['Fluids', 'Antibiotics', 'Oxygen'],
-        vbgClinicalState: "septic_shock",
-        learningLinks: [{ label: "NICE NG51: Sepsis", url: "https://www.nice.org.uk/guidance/ng51" }]
-      },
-      {
-        id: 'PED006', title: 'Life Threatening Asthma (Paeds)', category: 'Medical', ageRange: 'Paediatric',
-        ageGenerator: () => getRandomInt(4, 14),
-        patientProfileTemplate: "A {age}-year-old known asthmatic. Inhalers not helping.",
-        presentingComplaint: 'Severe difficulty breathing.',
-        scenarioDetails: ['Silent chest.', 'Too breathless to talk.', 'Agitated -> Drowsy.'],
-        vitalsMod: { hr: 160, bpSys: 110, bpDia: 70, spO2: 85, rr: 50, gcs: 13 },
-        deterioration: { active: true, rate: 0.15, type: 'respiratory' },
-        stabilisers: ['Adrenaline', 'Magnesium', 'Nebs', 'Dexamethasone'],
-        vbgClinicalState: "respiratory_acidosis_acute",
-        learningLinks: [{ label: "BTS/SIGN Asthma Guidelines", url: "https://www.brit-thoracic.org.uk/" }]
-      },
-      {
-        id: 'PM006', title: 'Neonatal Sepsis (GBS)', category: 'Medical', ageRange: 'Paediatric',
-        ageGenerator: () => 0, 
-        patientProfileTemplate: "A 5-day-old neonate. Poor feeding and grunt.",
-        presentingComplaint: 'Lethargy, Poor Feeding.',
-        scenarioDetails: ['Grunting.', 'Mottled skin.', 'Hypothermic.'],
-        vitalsMod: { hr: 180, bpSys: 60, bpDia: 30, spO2: 90, rr: 70, temp: 35.8, gcs: 10 },
-        deterioration: { active: true, rate: 0.1, type: 'sepsis' },
-        stabilisers: ['Antibiotics', 'Fluids', 'Warmth'],
-        vbgClinicalState: "septic_shock",
-        learningLinks: [{ label: "NICE NG195: Neonatal Infection", url: "https://www.nice.org.uk/" }]
-      },
-      {
-        id: 'PM007', title: 'Duct-Dependent Collapse', category: 'Medical', ageRange: 'Paediatric',
-        ageGenerator: () => 0, 
-        patientProfileTemplate: "A 10-day-old. Sudden collapse at home. 'Grey' colour.",
-        presentingComplaint: 'Collapse, Cyanosis.',
-        scenarioDetails: ['Severe shock.', 'Femoral pulses absent.', 'Hepatomegaly (Heart Failure).'],
-        vitalsMod: { hr: 190, bpSys: 50, bpDia: 30, spO2: 75, rr: 80, gcs: 8 },
-        deterioration: { active: true, rate: 0.15, type: 'cardiac' },
-        stabilisers: ['Prostin' /* PGE1 */, 'Intubation'],
-        vbgClinicalState: "metabolic_acidosis_severe",
-        learningLinks: [{ label: "APLS: Cardiac", url: "https://www.alsg.org/" }]
-      }
-    ];
-
-    // --- 2. COMPONENTS ---
-
-    const { useState, useEffect, useRef } = React;
-    
-    const Lucide = ({ icon, className }) => <i data-lucide={icon} className={className}></i>;
-
-    // --- REUSABLE UI COMPONENTS ---
-    const Button = ({ onClick, children, variant = 'primary', className = '', disabled = false }) => {
-        const base = "px-4 py-3 rounded font-semibold transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm text-sm touch-manipulation relative overflow-hidden";
-        const variants = {
-            primary: "bg-sky-600 hover:bg-sky-500 text-white",
-            secondary: "bg-slate-700 hover:bg-slate-600 text-slate-200",
-            danger: "bg-red-600 hover:bg-red-500 text-white",
-            success: "bg-emerald-600 hover:bg-emerald-500 text-white",
-            outline: "border border-slate-600 text-slate-300 hover:bg-slate-800"
+        const generateIdentity = () => {
+            const first = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
+            const last = NAMES[Math.floor(Math.random() * NAMES.length)];
+            const r = Math.random();
+            let age;
+            if (r < 0.15) age = Math.floor(Math.random() * 12) + "y"; 
+            else if (r < 0.75) age = Math.floor(Math.random() * 50) + 18 + "y"; 
+            else age = Math.floor(Math.random() * 20) + 70 + "y"; 
+            
+            const gender = Math.random() > 0.5 ? "M" : "F";
+            return { name: `${first} ${last}`, age, gender };
         };
-        return <button onClick={onClick} disabled={disabled} className={`${base} ${variants[variant]} ${className}`}>{children}</button>;
-    };
 
-    const Card = ({ title, icon, children, className = "" }) => (
-        <div className={`bg-slate-800 border border-slate-700 rounded-lg overflow-hidden shadow-lg ${className}`}>
-            {title && (
-                <div className="bg-slate-800/50 p-3 border-b border-slate-700 flex items-center gap-2">
-                    {icon && <Lucide icon={icon} className="w-5 h-5 text-sky-400" />}
-                    <h3 className="font-bold text-slate-200">{title}</h3>
+        const PATIENT_DECK = [
+            { id: 'P1-001', category: 'P1', injuryLoc: 'chest', text: 'GSW Chest. <C>ABC issue. Needs: Chest Drain, Thoracotomy.', vitals: { hr: 140, sbp: 70, rr: 32, gcs: 14, spo2: 88 } },
+            { id: 'P1-002', category: 'P1', injuryLoc: 'abdo', text: 'Blast Abdomen. Rigid. Needs: Damage Control Surgery.', vitals: { hr: 130, sbp: 85, rr: 24, gcs: 15, spo2: 94 } },
+            { id: 'P1-003', category: 'P1', injuryLoc: 'chest', text: 'Open Thoracic Wound. Sucking. Needs: Seal, Drain.', vitals: { hr: 120, sbp: 90, rr: 30, gcs: 14, spo2: 90 } },
+            { id: 'P1-004', category: 'P1', injuryLoc: 'leg', text: 'Crush Injury >4h. Hyperkalaemia. Needs: ICU.', vitals: { hr: 110, sbp: 100, rr: 20, gcs: 15, spo2: 96 } },
+            { id: 'P2-001', category: 'P2', injuryLoc: 'abdo', text: 'Stable Penetrating Abdomen. FAST positive.', vitals: { hr: 95, sbp: 110, rr: 18, gcs: 15, spo2: 98 } },
+            { id: 'P2-002', category: 'P2', injuryLoc: 'abdo', text: 'Pelvic #. Binder applied. Stable.', vitals: { hr: 100, sbp: 105, rr: 20, gcs: 15, spo2: 97 } },
+            { id: 'P2-003', category: 'P2', injuryLoc: 'head', text: 'TBI. Pupillary asymmetry. Needs: Urgent CT.', vitals: { hr: 60, sbp: 160, rr: 12, gcs: 10, spo2: 96 } },
+            { id: 'P3-001', category: 'P3', injuryLoc: 'arm', text: 'Laceration Arm. Controlled. Needs: Suture.', vitals: { hr: 80, sbp: 120, rr: 14, gcs: 15, spo2: 99 } },
+            { id: 'P3-002', category: 'P3', injuryLoc: 'head', text: 'Closed Head Injury. Needs: Obs.', vitals: { hr: 76, sbp: 118, rr: 14, gcs: 15, spo2: 100 } },
+            { id: 'CBRN-01', category: 'P1', injuryLoc: 'head', text: 'Nerve Agent. Pinpoint pupils. Needs: DECON, Atropine.', vitals: { hr: 45, sbp: 90, rr: 30, gcs: 9, spo2: 85 } }
+        ];
+
+        const EVENTS = [
+            { title: "Major Incident Declared", effect: "Activate Plan. Clear ED." },
+            { title: "Second Wave", effect: "Add 4 patients to Ambulance Bay." },
+            { title: "CT Failure", effect: "CT Capacity 0 for this turn." },
+            { title: "Mutual Aid", effect: "Gain 5 Staff Resources." },
+            { title: "Blood Shortage", effect: "Blood Resources halved." }
+        ];
+
+        // --- COMPONENTS ---
+
+        const StickFigure = ({ injuryLoc }) => (
+            <svg width="30" height="50" viewBox="0 0 100 100" className="overflow-visible opacity-90">
+                <circle cx="50" cy="15" r="12" fill="none" stroke="currentColor" strokeWidth="6" />
+                <line x1="50" y1="27" x2="50" y2="60" stroke="currentColor" strokeWidth="6" />
+                <line x1="50" y1="35" x2="20" y2="50" stroke="currentColor" strokeWidth="6" />
+                <line x1="50" y1="35" x2="80" y2="50" stroke="currentColor" strokeWidth="6" />
+                <line x1="50" y1="60" x2="30" y2="95" stroke="currentColor" strokeWidth="6" />
+                <line x1="50" y1="60" x2="70" y2="95" stroke="currentColor" strokeWidth="6" />
+                {injuryLoc === 'head' && <circle cx="50" cy="15" r="15" stroke="red" strokeWidth="4" fill="none" className="animate-pulse" />}
+                {injuryLoc === 'chest' && <circle cx="50" cy="40" r="12" stroke="red" strokeWidth="4" fill="none" className="animate-pulse" />}
+                {injuryLoc === 'abdo' && <circle cx="50" cy="55" r="10" stroke="red" strokeWidth="4" fill="none" className="animate-pulse" />}
+                {injuryLoc === 'arm' && <circle cx="20" cy="50" r="8" stroke="red" strokeWidth="4" fill="none" className="animate-pulse" />}
+                {injuryLoc === 'leg' && <circle cx="30" cy="90" r="8" stroke="red" strokeWidth="4" fill="none" className="animate-pulse" />}
+            </svg>
+        );
+
+        const VitalsDisplay = ({ vitals }) => {
+            const getVitalClass = (val, type) => {
+                if (type === 'hr') return (val > 120 || val < 50) ? 'vital-red' : (val > 100 ? 'vital-amber' : 'vital-normal');
+                if (type === 'sbp') return (val < 90) ? 'vital-red' : (val < 100 ? 'vital-amber' : 'vital-normal');
+                if (type === 'rr') return (val > 30 || val < 10) ? 'vital-red' : (val > 22 ? 'vital-amber' : 'vital-normal');
+                return 'text-gray-600';
+            };
+            return (
+                <div className="grid grid-cols-2 gap-x-1 text-[9px] font-mono mt-0.5 bg-white/50 p-0.5 rounded leading-none">
+                    <div>HR:<span className={getVitalClass(vitals.hr, 'hr')}>{vitals.hr}</span></div>
+                    <div>BP:<span className={getVitalClass(vitals.sbp, 'sbp')}>{vitals.sbp}</span></div>
+                    <div>RR:<span className={getVitalClass(vitals.rr, 'rr')}>{vitals.rr}</span></div>
+                    <div>SpO2:<span className={getVitalClass(vitals.spo2, 'spo2')}>{vitals.spo2}</span></div>
                 </div>
-            )}
-            <div className="p-4">{children}</div>
-        </div>
-    );
-    
-    const VitalDisplay = ({ label, value, prev, unit, lowIsBad = true, onUpdate }) => {
-        const [isEditing, setIsEditing] = useState(false);
-        const [editVal, setEditVal] = useState(value);
-
-        const getTrend = (curr, prev) => curr > prev ? '▲' : curr < prev ? '▼' : '▬';
-        const getTrendColor = (curr, prev, lowIsBad = true) => {
-            if (curr === prev) return 'text-slate-500';
-            if (lowIsBad) return curr > prev ? 'text-emerald-400' : 'text-red-400';
-            return curr > prev ? 'text-red-400' : 'text-emerald-400';
+            );
         };
 
-        useEffect(() => {
-            if (!isEditing) setEditVal(value);
-        }, [value, isEditing]);
+        const PatientCard = ({ patient, onSelect, isSelected, onDragStart }) => {
+            const getColorClass = (cat) => {
+                if(cat === 'P1') return "p1-bg";
+                if(cat === 'P2') return "p2-bg";
+                if(cat === 'P3') return "p3-bg";
+                return "dead-bg";
+            };
+            
+            const isRevealed = patient.location !== 'amb' || patient.triaged;
 
-        const handleBlur = () => {
-            setIsEditing(false);
-            if (editVal !== value) onUpdate(parseInt(editVal));
+            return (
+                <div 
+                    draggable
+                    onDragStart={(e) => onDragStart(e, patient.uniqueId)}
+                    onClick={() => onSelect(patient)}
+                    className={`p-1.5 rounded shadow-sm border border-black/5 text-xs cursor-grab active:cursor-grabbing mb-1.5 ${getColorClass(patient.category)} ${isSelected ? 'ring-2 ring-blue-600 ring-offset-1' : 'hover:shadow-md'} transition-all relative select-none`}
+                >
+                    <div className="flex justify-between items-start mb-0.5">
+                        <div className="overflow-hidden">
+                            <span className="font-bold text-gray-900 block leading-none truncate">{patient.name}</span>
+                            <span className="text-[9px] text-gray-600 truncate block">{patient.age} {patient.gender}</span>
+                        </div>
+                        {isRevealed ? (
+                            <span className="px-1 py-0 bg-white/80 rounded text-[9px] font-black border border-black/10">{patient.category}</span>
+                        ) : (
+                            <span className="px-1 py-0 bg-gray-200 rounded text-[9px] font-bold text-gray-500">?</span>
+                        )}
+                    </div>
+                    
+                    {isRevealed ? (
+                        <>
+                            <div className="flex gap-1.5 items-center">
+                                <div className="text-gray-800 text-[9px] leading-tight flex-1 line-clamp-2 h-6">{patient.text}</div>
+                            </div>
+                            <VitalsDisplay vitals={patient.vitals} />
+                        </>
+                    ) : (
+                        <div className="text-[9px] text-gray-500 italic py-1 text-center">Awaiting Triage...</div>
+                    )}
+
+                    <div className="mt-0.5 flex justify-between items-center text-[9px] font-medium text-gray-600 border-t border-black/5 pt-0.5">
+                        {patient.treated ? 
+                            <span className="text-emerald-700 font-bold flex items-center gap-1">✓ Stable</span> : 
+                            <span className="text-amber-700 font-bold flex items-center gap-1">⚠ Unstable</span>
+                        }
+                        {patient.category === 'P1' && !patient.treated && (
+                             <span className="text-red-600 animate-pulse font-black">CRITICAL</span>
+                        )}
+                    </div>
+                </div>
+            );
         };
 
-        return (
-            <div className="bg-slate-900/50 p-3 rounded border border-slate-700 flex flex-col items-center justify-center h-28 relative touch-manipulation">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{label}</span>
-                {isEditing ? (
-                    <input 
-                        type="number" 
-                        value={editVal} 
-                        onChange={(e) => setEditVal(e.target.value)}
-                        onBlur={handleBlur}
-                        onKeyDown={(e) => e.key === 'Enter' && handleBlur()}
-                        className="text-2xl font-mono font-bold text-white bg-slate-800 border border-slate-500 rounded w-20 text-center"
-                        autoFocus
-                    />
-                ) : (
-                    <div className="flex items-baseline gap-1 cursor-pointer hover:bg-slate-800/50 rounded px-2 py-2" onClick={() => { setEditVal(value); setIsEditing(true); }}>
-                        <span className="text-3xl font-mono font-bold text-white">{Math.round(value)}</span>
-                        <span className={`text-sm font-bold ${getTrendColor(value, prev, lowIsBad)}`}>
-                            {getTrend(value, prev)}
+        const ZoneDisplay = ({ zone, patients, onPatientSelect, selectedPatientId, onDrop, onDragOver }) => {
+            const zonePatients = patients.filter(p => p.location === zone.id);
+            const isFull = zonePatients.length >= zone.capacity;
+            const isOverflow = zonePatients.length > zone.capacity;
+
+            return (
+                <div 
+                    onDragOver={onDragOver}
+                    onDrop={(e) => onDrop(e, zone.id)}
+                    className={`bg-white rounded-lg shadow-sm border h-full flex flex-col overflow-hidden zone-card ${isOverflow ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-200'}`}
+                >
+                    <div className={`px-2 py-1.5 border-b flex justify-between items-center ${zone.id === 'morgue' ? 'bg-gray-800 text-white' : 'bg-gray-50 text-gray-700'}`}>
+                        <h3 className="font-bold text-[10px] uppercase tracking-wide truncate">{zone.name}</h3>
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${isFull ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                            {zonePatients.length}/{zone.capacity}
                         </span>
                     </div>
-                )}
-                <span className="text-[10px] text-slate-600 mt-1">{unit}</span>
-            </div>
-        );
-    };
-
-    const InvestigationButton = ({ type, icon, label, isRevealed, isLoading, revealInvestigation, isRunning, scenario }) => {
-        const hasData = (type === 'ECG' && scenario.ecg) || (type === 'CXR' && scenario.chestXray) || (type === 'POCUS' && scenario.ultrasound) || (type === 'VBG' && scenario.vbg) || (type === 'CT' && scenario.ct);
-        
-        return (
-            <div className="flex flex-col gap-2">
-                <Button 
-                    variant={isRevealed ? "secondary" : "outline"} 
-                    onClick={() => revealInvestigation(type)} 
-                    disabled={!isRunning || isRevealed || isLoading}
-                    className="h-10 text-xs relative overflow-hidden"
-                >
-                    {isLoading && <div className="loading-bar"></div>}
-                    <div className="relative z-10 flex items-center gap-2">
-                        <Lucide icon={icon} className="w-3 h-3"/> {isLoading ? `Requesting...` : (isRevealed ? `View ${type}` : `Request ${type}`)}
-                    </div>
-                </Button>
-                {isRevealed && (
-                    <div className="p-3 bg-slate-700/30 rounded text-xs border-l-2 border-sky-500 animate-fadeIn">
-                        {hasData ? (
-                            type === 'VBG' ? 
-                                `pH ${scenario.vbg.pH.toFixed(2)} | pCO2 ${scenario.vbg.pCO2} | Lac ${scenario.vbg.Lac} | K ${scenario.vbg.K}` :
-                            type === 'ECG' ? `${scenario.ecg.type} - ${scenario.ecg.findings}` :
-                            type === 'CXR' ? scenario.chestXray.findings :
-                            type === 'POCUS' ? scenario.ultrasound.findings : 
-                            type === 'CT' ? scenario.ct.findings : 'Normal / Not Indicated'
-                        ) : 'Normal / Not Indicated'}
-                    </div>
-                )}
-            </div>
-        );
-    };
-
-
-    // --- SIMULATION ENGINE ---
-    const useSimulation = (initialScenario) => {
-        const [scenario, setScenario] = useState(initialScenario);
-        const [time, setTime] = useState(0);
-        const [isRunning, setIsRunning] = useState(false);
-        const [vitals, setVitals] = useState({ ...initialScenario.vitals });
-        const [prevVitals, setPrevVitals] = useState({ ...initialScenario.vitals });
-        const [log, setLog] = useState([]);
-        const [flash, setFlash] = useState(null); 
-        const [investigationsRevealed, setInvestigationsRevealed] = useState({}); 
-        const [loadingInvestigations, setLoadingInvestigations] = useState({}); 
-        const [history, setHistory] = useState([]);
-
-        const timerRef = useRef(null);
-        const tickRef = useRef(null);
-
-        const addLogEntry = (msg, type = 'info') => {
-            const timestamp = new Date().toLocaleTimeString('en-GB');
-            const simTime = `${Math.floor(time/60).toString().padStart(2,'0')}:${(time%60).toString().padStart(2,'0')}`;
-            const logEntry = { time: timestamp, simTime, msg, type, timeSeconds: time };
-            setLog(prev => [...prev, logEntry]);
-            
-            if (type === 'action' || type === 'success') {
-                setHistory(prev => {
-                    if (prev.length === 0) return prev;
-                    const lastIdx = prev.length - 1;
-                    const newHist = [...prev];
-                    if (!newHist[lastIdx].actions) newHist[lastIdx].actions = [];
-                    newHist[lastIdx].actions.push(msg.split(' ')[0]); 
-                    return newHist;
-                });
-            }
-        };
-
-        const applyIntervention = (key) => {
-            const action = INTERVENTIONS[key];
-            if (!action) return;
-
-            setPrevVitals({ ...vitals });
-            const newVitals = { ...vitals };
-            
-            // Branching Logic
-            if (key === 'Fluids' && scenario.id === 'AM005') { // Acute HF
-                 newVitals.spO2 = Math.max(70, newVitals.spO2 - 5); 
-                 newVitals.rr += 4;
-                 addLogEntry("Warning: Fluids caused respiratory deterioration!", 'danger');
-                 setFlash('red');
-            } else {
-                // Standard Effects
-                if (action.effect.SpO2) newVitals.spO2 = Math.min(100, newVitals.spO2 + action.effect.SpO2);
-                if (action.effect.BP) newVitals.bpSys += action.effect.BP;
-                if (action.effect.BP) newVitals.bpDia += Math.floor(action.effect.BP * 0.65); 
-                if (action.effect.HR) newVitals.hr += action.effect.HR;
-                if (action.effect.RR) newVitals.rr += action.effect.RR;
-                if (action.effect.gcs) newVitals.gcs = Math.max(3, Math.min(15, newVitals.gcs + action.effect.gcs));
-
-                if (scenario.stabilisers && scenario.stabilisers.includes(key)) {
-                    setScenario(prev => ({
-                        ...prev,
-                        deterioration: { ...prev.deterioration, rate: Math.max(0, prev.deterioration.rate - 0.05) }
-                    }));
-                    addLogEntry(`${action.log} (Effective)`, 'success');
-                    setFlash('green');
-                } else {
-                    addLogEntry(action.log, 'action');
-                }
-            }
-
-            setVitals(newVitals);
-            setTimeout(() => setFlash(null), 1000);
-        };
-
-        const manualUpdateVital = (key, value) => {
-            setPrevVitals({...vitals});
-            setVitals(prev => ({ ...prev, [key]: value }));
-            addLogEntry(`Manual override: ${key} set to ${value}`, 'manual');
-        };
-
-        const toggleDeterioration = () => {
-            setScenario(prev => {
-                const newState = !prev.deterioration.active;
-                addLogEntry(`Deterioration ${newState ? 'Resumed' : 'Paused'}`, 'manual');
-                return { ...prev, deterioration: { ...prev.deterioration, active: newState } };
-            });
-        };
-
-        const triggerArrest = () => {
-            setPrevVitals({...vitals});
-            setVitals(prev => ({ ...prev, hr: 0, bpSys: 0, bpDia: 0, spO2: 0, rr: 0, gcs: 3 }));
-            addLogEntry('CARDIAC ARREST', 'manual');
-            setFlash('red');
-        };
-
-        const revealInvestigation = (type) => {
-             if (investigationsRevealed[type] || loadingInvestigations[type]) return;
-             
-             setLoadingInvestigations(prev => ({ ...prev, [type]: true }));
-             
-             setTimeout(() => {
-                 setLoadingInvestigations(prev => ({ ...prev, [type]: false }));
-                 setInvestigationsRevealed(prev => ({ ...prev, [type]: true }));
-                 addLogEntry(`${type} Result Available`, 'success');
-             }, 2000);
-        };
-
-        const tick = () => {
-            setVitals(current => {
-                const next = { ...current };
-                
-                if (current.hr === 0 && current.bpSys === 0) return next; 
-
-                next.hr += getRandomInt(-1, 1);
-                next.bpSys += getRandomInt(-2, 2);
-                next.bpDia += getRandomInt(-2, 2); 
-                next.spO2 += Math.random() > 0.9 ? getRandomInt(-1, 1) : 0;
-
-                if (scenario.deterioration?.active && scenario.deterioration.rate > 0) {
-                    const rate = scenario.deterioration.rate;
-                    if (Math.random() < rate) {
-                        if (scenario.deterioration.type === 'shock') {
-                            next.bpSys -= 1;
-                            next.bpDia -= 1; 
-                            next.hr += 1;
-                        } else if (scenario.deterioration.type === 'respiratory') {
-                            next.spO2 -= 1;
-                            next.rr += (Math.random() > 0.8 ? 1 : 0);
-                        } else if (scenario.deterioration.type === 'cardiac') {
-                            next.bpSys -= 1;
-                            next.bpDia -= 1;
-                        } else if (scenario.deterioration.type === 'neuro') {
-                            next.hr -= 1; 
-                            next.bpSys += 1; 
-                        } else if (scenario.deterioration.type === 'metabolic') {
-                            next.hr += 1;
-                            next.temp = parseFloat((next.temp + 0.1).toFixed(1));
-                        }
-                    }
-                }
-                next.spO2 = Math.min(100, Math.max(0, next.spO2));
-                next.hr = Math.max(0, next.hr);
-                
-                setHistory(h => [...h, {
-                    time: time,
-                    hr: next.hr,
-                    bp: next.bpSys,
-                    spo2: next.spO2,
-                    rr: next.rr,
-                    actions: [] 
-                }]);
-
-                return next;
-            });
-        };
-        
-        useEffect(() => {
-            if (time > 300 && scenario.id === 'AM001' && !scenario.ecg.findings.includes('Evolving')) {
-                 setScenario(prev => ({
-                     ...prev,
-                     ecg: { ...prev.ecg, findings: "Massive Anterior STE. Tombstoning. (Evolving)" }
-                 }));
-                 addLogEntry("ECG Changes noted on monitor", "info");
-            }
-        }, [time, scenario.id]);
-
-        useEffect(() => {
-            if (vitals.spO2 < 85 || vitals.bpSys < 80 || vitals.hr > 160 || (vitals.hr < 40 && vitals.hr > 0)) {
-                if (time % 5 === 0 && isRunning) setFlash('red');
-                else setFlash(null);
-            }
-        }, [vitals, time, isRunning]);
-
-        const start = () => {
-            if (isRunning) return;
-            setIsRunning(true);
-            addLogEntry("Simulation Started", 'system');
-            timerRef.current = setInterval(() => setTime(t => t + 1), 1000);
-            tickRef.current = setInterval(tick, 3000);
-        };
-
-        const pause = () => {
-            setIsRunning(false);
-            addLogEntry("Simulation Paused", 'system');
-            clearInterval(timerRef.current);
-            clearInterval(tickRef.current);
-        };
-
-        const stop = () => {
-            pause();
-            addLogEntry("Simulation Ended", 'system');
-        };
-
-        return {
-            scenario, time, isRunning, vitals, prevVitals, log, flash, history, investigationsRevealed, loadingInvestigations,
-            start, pause, stop, applyIntervention, addLogEntry, manualUpdateVital, toggleDeterioration, triggerArrest, revealInvestigation
-        };
-    };
-
-    // --- SUB-SCREENS ---
-
-    const SetupScreen = ({ onGenerate, initialParams }) => {
-        const [category, setCategory] = useState(initialParams?.category || 'Any');
-        const [age, setAge] = useState(initialParams?.age || 'Any');
-        const [hf, setHf] = useState(initialParams?.hf || 'hf0');
-        const [loading, setLoading] = useState(false);
-        const [customMode, setCustomMode] = useState(initialParams?.customMode || false);
-        const [error, setError] = useState("");
-        
-        const [customScenario, setCustomScenario] = useState({
-            title: "Custom Scenario",
-            age: 40,
-            sex: "male",
-            complaint: "Shortness of breath",
-            profile: "A 40-year-old male with no past medical history.",
-            hr: 80, bpSys: 120, rr: 16, spO2: 98, temp: 37.0, gcs: 15, bm: 5.5,
-            ecgType: "Sinus Rhythm", ecgFindings: "Normal",
-            cxrFindings: "Clear",
-            vbgState: "normal"
-        });
-
-        const handleGenerate = () => {
-            setError("");
-            setLoading(true);
-            setTimeout(() => {
-                let generatedScenario;
-                const currentParams = { category, age, hf, customMode };
-
-                if (customMode) {
-                    generatedScenario = {
-                        id: 'CUSTOM',
-                        title: customScenario.title,
-                        category: 'Custom',
-                        ageRange: 'Custom',
-                        patientAge: customScenario.age,
-                        profile: customScenario.profile,
-                        presentingComplaint: customScenario.complaint,
-                        scenarioDetails: ['Custom scenario generated by user.'],
-                        vitals: {
-                            hr: parseInt(customScenario.hr),
-                            bpSys: parseInt(customScenario.bpSys),
-                            bpDia: Math.floor(parseInt(customScenario.bpSys) * 0.65),
-                            rr: parseInt(customScenario.rr),
-                            spO2: parseInt(customScenario.spO2),
-                            temp: parseFloat(customScenario.temp),
-                            gcs: parseInt(customScenario.gcs),
-                            bm: parseFloat(customScenario.bm)
-                        },
-                        vbg: generateVbg(customScenario.vbgState),
-                        hf: HUMAN_FACTOR_CHALLENGES.find(h => h.id === hf),
-                        ecg: { type: customScenario.ecgType, findings: customScenario.ecgFindings },
-                        chestXray: { findings: customScenario.cxrFindings },
-                        deterioration: { active: false, rate: 0 },
-                        stabilisers: [],
-                        interventions: ['Oxygen', 'Fluids', 'Analgesia']
-                    };
-                } else {
-                    let pool = ALL_SCENARIOS.filter(s => 
-                        (category === 'Any' || s.category === category) &&
-                        (age === 'Any' || s.ageRange === age)
-                    );
-                    
-                    if (pool.length === 0) {
-                        setLoading(false);
-                        setError(`No scenarios found for ${category} + ${age}. Please try a different combination.`);
-                        return;
-                    }
-
-                    const base = pool[Math.floor(Math.random() * pool.length)];
-                    const patientAge = base.ageGenerator();
-                    const ranges = getBaseVitals(patientAge);
-                    
-                    let startVitals = {
-                        hr: base.vitalsMod?.hr !== undefined ? base.vitalsMod.hr : ranges.hr,
-                        bpSys: base.vitalsMod?.bpSys !== undefined ? base.vitalsMod.bpSys : ranges.bpSys,
-                        bpDia: base.vitalsMod?.bpDia !== undefined ? base.vitalsMod.bpDia : (ranges.bpDia || Math.floor((base.vitalsMod?.bpSys || ranges.bpSys) * 0.65)),
-                        rr: base.vitalsMod?.rr !== undefined ? base.vitalsMod.rr : ranges.rr,
-                        spO2: base.vitalsMod?.spO2 !== undefined ? base.vitalsMod.spO2 : 98,
-                        temp: base.vitalsMod?.temp !== undefined ? base.vitalsMod.temp : ranges.temp,
-                        gcs: base.vitalsMod?.gcs !== undefined ? base.vitalsMod.gcs : 15,
-                        bm: ranges.bm
-                    };
-
-                    const profile = base.patientProfileTemplate
-                        .replace(/{age}/g, patientAge)
-                        .replace(/{sex}/g, Math.random() > 0.5 ? 'male' : 'female')
-                        .replace(/{durationPain}/g, getRandomInt(1,4));
-
-                    generatedScenario = {
-                        ...base,
-                        patientAge,
-                        profile,
-                        vitals: startVitals,
-                        vbg: generateVbg(base.vbgClinicalState),
-                        hf: HUMAN_FACTOR_CHALLENGES.find(h => h.id === hf)
-                    };
-                }
-                
-                if (generatedScenario.ageRange === 'Paediatric' || generatedScenario.patientAge < 18) {
-                     generatedScenario.weight = estimateWeight(generatedScenario.patientAge);
-                }
-
-                setLoading(false);
-                onGenerate(generatedScenario, currentParams);
-            }, 600);
-        };
-
-        useEffect(() => {
-            if (initialParams && initialParams.autoGenerate) {
-                handleGenerate();
-            }
-        }, []);
-
-        return (
-            <div className="max-w-2xl mx-auto space-y-6 p-2">
-                <div className="bg-slate-800 p-4 md:p-6 rounded-lg border border-slate-700 shadow-xl">
-                    <h2 className="text-xl font-bold text-sky-400 mb-4 flex items-center gap-2"><Lucide icon="settings" className="w-5 h-5"/> Simulation Parameters</h2>
-                    
-                    <div className="flex gap-4 mb-6 border-b border-slate-700 pb-2 overflow-x-auto">
-                        <button onClick={() => setCustomMode(false)} className={`text-sm font-bold uppercase pb-1 whitespace-nowrap ${!customMode ? 'text-sky-400 border-b-2 border-sky-400' : 'text-slate-500'}`}>Random Scenario</button>
-                        <button onClick={() => setCustomMode(true)} className={`text-sm font-bold uppercase pb-1 whitespace-nowrap ${customMode ? 'text-sky-400 border-b-2 border-sky-400' : 'text-slate-500'}`}>Custom Scenario</button>
-                    </div>
-
-                    {!customMode ? (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                            <div>
-                                <label className="text-xs uppercase text-slate-500 font-bold">Category</label>
-                                <select value={category} onChange={e=>setCategory(e.target.value)} className="w-full bg-slate-700 border-slate-600 rounded p-3 text-sm">
-                                    <option value="Any">Any</option>
-                                    <option value="Medical">Medical</option>
-                                    <option value="Trauma">Trauma</option>
-                                    <option value="Toxicology">Toxicology</option>
-                                    <option value="Psychiatry">Psychiatry</option>
-                                    <option value="Obstetric & Gynae Emergencies">Obs & Gynae</option>
-                                    <option value="Obstetrics">Obstetrics (Maternal)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-xs uppercase text-slate-500 font-bold">Age</label>
-                                <select value={age} onChange={e=>setAge(e.target.value)} className="w-full bg-slate-700 border-slate-600 rounded p-3 text-sm">
-                                    <option value="Any">Any</option>
-                                    <option value="Adult">Adult (18-65)</option>
-                                    <option value="Elderly">Elderly (>65)</option>
-                                    <option value="Paediatric">Paediatric (&lt;18)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-xs uppercase text-slate-500 font-bold">Human Factor</label>
-                                <select value={hf} onChange={e=>setHf(e.target.value)} className="w-full bg-slate-700 border-slate-600 rounded p-3 text-sm">
-                                    {HUMAN_FACTOR_CHALLENGES.map(h => <option key={h.id} value={h.id}>{h.type}</option>)}
-                                </select>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="space-y-4 mb-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs text-slate-500 font-bold">Title</label>
-                                    <input type="text" value={customScenario.title} onChange={e => setCustomScenario({...customScenario, title: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded p-3 text-sm"/>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {error && <div className="mb-4 p-3 bg-red-900/30 border border-red-500 rounded text-red-200 text-sm font-bold flex items-center gap-2"><Lucide icon="alert-circle" className="w-4 h-4"/>{error}</div>}
-
-                    <Button onClick={handleGenerate} disabled={loading} className="w-full py-4 text-lg">
-                        {loading ? <Lucide icon="loader-2" className="animate-spin"/> : <Lucide icon="play"/>}
-                        {loading ? "Building Scenario..." : "Generate Scenario"}
-                    </Button>
-                </div>
-            </div>
-        );
-    };
-
-    const BriefingScreen = ({ scenario, onStart, onBack, onNewScenario }) => (
-        <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn p-2">
-            <div className="bg-slate-800 p-4 md:p-6 rounded-lg border-l-4 border-sky-500 shadow-lg">
-                <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-                    <div>
-                        <h2 className="text-2xl md:text-3xl font-bold text-white">{scenario.title}</h2>
-                        <span className="inline-block bg-slate-700 text-sky-300 text-xs px-2 py-1 rounded mt-2">{scenario.category}</span>
-                    </div>
-                    <div className="text-left md:text-right">
-                        <p className="text-2xl font-mono font-bold text-emerald-400">GCS {scenario.vitals.gcs}</p>
-                        <p className="text-sm text-slate-400">Initial Status</p>
-                    </div>
-                </div>
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <h3 className="text-sm font-bold text-slate-500 uppercase mb-1">Patient Profile</h3>
-                        <p className="text-lg leading-relaxed">{scenario.profile}</p>
-                        {scenario.weight && <div className="mt-2 p-2 bg-sky-900/30 border border-sky-700/50 rounded inline-block">
-                            <p className="text-xs text-sky-400 font-bold uppercase">Est. Weight (APLS)</p>
-                            <p className="text-lg font-mono text-white">{scenario.weight} kg</p>
-                        </div>}
-                        <div className="mt-4 p-3 bg-slate-700/50 rounded border border-slate-600">
-                            <p className="font-bold text-sky-300"><Lucide icon="alert-circle" className="inline w-4 h-4 mr-1"/> PC: {scenario.presentingComplaint}</p>
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        {scenario.scenarioDetails.map((d, i) => (
-                            <div key={i} className="flex items-start gap-2 text-slate-300">
-                                <Lucide icon="chevron-right" className="w-4 h-4 mt-1 text-slate-500 flex-shrink-0"/>
-                                <p>{d}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {scenario.hf.id !== 'hf0' && (
-                <div className="bg-purple-900/20 border border-purple-500/50 p-4 rounded flex items-center gap-3">
-                    <Lucide icon="users" className="text-purple-400 w-6 h-6"/>
-                    <div>
-                        <h4 className="font-bold text-purple-200">{scenario.hf.type}</h4>
-                        <p className="text-sm text-purple-300">{scenario.hf.description}</p>
-                    </div>
-                </div>
-            )}
-
-            <div className="flex flex-col md:flex-row justify-center gap-4 pt-4">
-                <Button onClick={onBack} variant="secondary" className="w-full md:w-1/3 py-4 text-lg">
-                    <Lucide icon="arrow-left"/> Back
-                </Button>
-                <Button onClick={onNewScenario} variant="secondary" className="w-full md:w-1/3 py-4 text-lg">
-                    <Lucide icon="refresh-cw"/> New Scenario
-                </Button>
-                <Button onClick={onStart} className="w-full md:w-1/3 py-4 text-lg shadow-sky-900/20 shadow-xl">
-                    <Lucide icon="activity"/> Start Live Simulation
-                </Button>
-            </div>
-        </div>
-    );
-
-    const LiveSimScreen = ({ sim, onFinish, onBack }) => {
-        const { scenario, time, isRunning, vitals, prevVitals, log, flash, start, pause, applyIntervention, addLogEntry, manualUpdateVital, toggleDeterioration, triggerArrest, revealInvestigation, investigationsRevealed, loadingInvestigations } = sim;
-        const logContainerRef = useRef(null);
-        const [manualLog, setManualLog] = useState("");
-        const [manualNotes, setManualNotes] = useState("");
-        const [activeTab, setActiveTab] = useState("Airway"); 
-
-        useEffect(() => {
-            if (logContainerRef.current) {
-                logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-            }
-        }, [log]);
-
-        const formatTime = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
-        
-        const getInterventionsByCat = (cat) => {
-            return Object.keys(INTERVENTIONS).filter(key => INTERVENTIONS[key].category === cat);
-        };
-
-        return (
-            <div className={`max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 transition-colors duration-500 ${flash === 'red' ? 'flash-red' : (flash === 'green' ? 'flash-green' : '')}`}>
-                
-                <div className="lg:col-span-2 space-y-6 order-1">
-                    <Card className="bg-slate-800 border-slate-700">
-                        <div className="flex justify-between items-start flex-wrap gap-2">
-                            <div>
-                                <h3 className="font-bold text-lg text-white mb-1">{scenario.title} ({scenario.patientAge})</h3>
-                                <p className="text-sm text-slate-300">{scenario.profile}</p>
-                                {scenario.weight && <p className="text-xs text-sky-400 mt-1 font-bold">Est. Weight: {scenario.weight}kg</p>}
-                            </div>
-                            <div className="bg-sky-900/50 border border-sky-700 px-3 py-1 rounded">
-                                <p className="text-xs font-bold text-sky-300 uppercase">Presenting Complaint</p>
-                                <p className="text-sm text-white">{scenario.presentingComplaint}</p>
-                            </div>
-                        </div>
-                    </Card>
-
-                    <Card className="bg-slate-900 border-slate-800">
-                        <div className="flex flex-col md:flex-row justify-between items-center mb-4 border-b border-slate-800 pb-2 gap-3">
-                            <div className="flex gap-2 w-full md:w-auto">
-                                <Button variant="secondary" onClick={onBack} disabled={isRunning} className="h-10 md:h-8 text-xs px-3 flex-1 md:flex-none"><Lucide icon="arrow-left" className="w-3 h-3"/> Back</Button>
-                                {!isRunning ? (
-                                    <Button variant="success" onClick={start} className="h-12 text-base px-6 font-bold shadow-lg flex-grow md:flex-none"><Lucide icon="play" className="w-5 h-5"/> START</Button>
-                                ) : (
-                                    <Button variant="danger" onClick={pause} className="h-10 md:h-8 text-xs px-3 flex-1 md:flex-none"><Lucide icon="pause" className="w-3 h-3"/> Pause</Button>
-                                )}
-                                <Button variant="primary" onClick={onFinish} className="h-10 md:h-8 text-xs px-3 flex-1 md:flex-none"><Lucide icon="square" className="w-3 h-3"/> Finish</Button>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className={`w-3 h-3 rounded-full ${isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
-                                <div className="font-mono text-2xl font-bold text-emerald-400 bg-black/40 px-4 py-1 rounded">
-                                    {formatTime(time)}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                            <VitalDisplay label="Heart Rate" value={vitals.hr} prev={prevVitals.hr} unit="bpm" lowIsBad={false} onUpdate={(v) => manualUpdateVital('hr', v)}/>
-                            <div className="bg-slate-900/50 p-3 rounded border border-slate-700 flex flex-col items-center justify-center h-28">
-                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">BP</span>
-                                <span className="text-2xl font-mono font-bold text-white">{Math.round(vitals.bpSys)}/{Math.round(vitals.bpDia)}</span>
-                                <span className="text-[10px] text-slate-600 mt-1">mmHg</span>
-                            </div>
-                            <VitalDisplay label="SpO2" value={vitals.spO2} prev={prevVitals.spO2} unit="%" onUpdate={(v) => manualUpdateVital('spO2', v)}/>
-                            <VitalDisplay label="Resp Rate" value={vitals.rr} prev={prevVitals.rr} unit="/min" lowIsBad={false} onUpdate={(v) => manualUpdateVital('rr', v)}/>
-                        </div>
-                        <div className="grid grid-cols-3 gap-3">
-                            <div className="bg-slate-900/30 p-2 rounded text-center border border-slate-700">
-                                <span className="text-xs text-slate-500 block">GCS</span>
-                                <span className="font-mono font-bold text-lg">{vitals.gcs}</span>
-                            </div>
-                            <div className="bg-slate-900/30 p-2 rounded text-center border border-slate-700">
-                                <span className="text-xs text-slate-500 block">Temp</span>
-                                <span className="font-mono font-bold text-lg">{vitals.temp}°C</span>
-                            </div>
-                            <div className="bg-slate-900/30 p-2 rounded text-center border border-slate-700">
-                                <span className="text-xs text-slate-500 block">Glucose</span>
-                                <span className="font-mono font-bold text-lg">{vitals.bm}</span>
-                            </div>
-                        </div>
-                    </Card>
-
-                    <Card title="Clinical Actions" icon="activity">
-                        <div className="flex justify-end gap-2 mb-4 border-b border-slate-700 pb-2">
-                            <Button variant="secondary" onClick={toggleDeterioration} className="text-xs h-10 border border-slate-600">
-                                <Lucide icon={scenario.deterioration.active ? "pause-circle" : "play-circle"} className="w-3 h-3"/> 
-                                {scenario.deterioration.active ? "Pause Det" : "Resume Det"}
-                            </Button>
-                            <Button variant="danger" onClick={triggerArrest} className="text-xs h-10">
-                                <Lucide icon="alert-triangle" className="w-3 h-3"/> Arrest
-                            </Button>
-                        </div>
-
-                        <div className="flex space-x-2 mb-4 overflow-x-auto pb-2 border-b border-slate-700 no-scrollbar">
-                            {['Airway', 'Circulation', 'Drugs', 'Procedures'].map(cat => (
-                                <button 
-                                    key={cat} 
-                                    onClick={() => setActiveTab(cat)}
-                                    className={`px-4 py-2 text-sm font-bold rounded transition-colors whitespace-nowrap ${activeTab === cat ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
-                                >
-                                    {cat}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
-                            {getInterventionsByCat(activeTab).map(key => (
-                                <Button key={key} variant="secondary" onClick={() => applyIntervention(key)} disabled={!isRunning} className="text-xs h-12 touch-manipulation">
-                                    {INTERVENTIONS[key]?.label || key}
-                                </Button>
-                            ))}
-                        </div>
-
-                        <div className="mt-4 pt-4 border-t border-slate-700">
-                            <form onSubmit={(e) => { e.preventDefault(); if(manualLog.trim()){ addLogEntry(manualLog, 'manual'); setManualLog(""); } }} className="flex gap-2">
-                                <input 
-                                    type="text" 
-                                    value={manualLog}
-                                    onChange={(e) => setManualLog(e.target.value)}
-                                    placeholder="Log action..." 
-                                    className="flex-grow bg-slate-900 border border-slate-600 rounded px-3 py-3 text-sm focus:outline-none focus:border-sky-500"
-                                    disabled={!isRunning}
+                    <div className="flex-1 p-1.5 overflow-y-auto bg-slate-50 min-h-[100px]">
+                        {zonePatients.length === 0 ? (
+                            <div className="h-full flex items-center justify-center text-gray-300 text-[9px] font-bold uppercase tracking-widest pointer-events-none">Drop Here</div>
+                        ) : (
+                            zonePatients.map(p => (
+                                <PatientCard 
+                                    key={p.uniqueId} 
+                                    patient={p} 
+                                    onSelect={onPatientSelect}
+                                    isSelected={selectedPatientId === p.uniqueId}
+                                    onDragStart={(e, id) => e.dataTransfer.setData("patientId", id)}
                                 />
-                                <Button type="submit" variant="outline" disabled={!isRunning || !manualLog.trim()} className="h-12">Log</Button>
-                            </form>
+                            ))
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const SitrepForm = ({ turn, patients }) => {
+            const p1Count = patients.filter(p => p.category === 'P1' && p.location !== 'discharged' && p.location !== 'morgue').length;
+            const p2Count = patients.filter(p => p.category === 'P2' && p.location !== 'discharged' && p.location !== 'morgue').length;
+            const p3Count = patients.filter(p => p.category === 'P3' && p.location !== 'discharged' && p.location !== 'morgue').length;
+            const total = p1Count + p2Count + p3Count;
+
+            return (
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-2 justify-center">
+                        <img src={LOGO_URL} className="h-8" />
+                        <span className="font-bold text-blue-900">WMEBEM Incident Command</span>
+                    </div>
+                    <div className="bg-amber-50 border-l-4 border-amber-500 p-3 text-xs text-amber-800">
+                        <strong>Command Note:</strong> Ensure accuracy. False reporting costs points.
+                    </div>
+                    <div className="border rounded bg-white overflow-hidden text-sm">
+                        <div className="bg-gray-100 px-4 py-2 font-bold border-b text-center text-gray-600">METHANE Report</div>
+                        <div className="p-4 space-y-2">
+                            <div className="grid grid-cols-6 gap-2 items-center">
+                                <div className="font-bold text-right text-gray-500">M</div>
+                                <div className="col-span-5"><input type="text" className="w-full bg-gray-50 border border-gray-200 rounded px-2 py-1 text-xs font-mono" value="MAJOR INCIDENT DECLARED" readOnly /></div>
+                            </div>
+                            <div className="grid grid-cols-6 gap-2 items-center">
+                                <div className="font-bold text-right text-gray-500">N</div>
+                                <div className="col-span-5 grid grid-cols-4 gap-2">
+                                    <div className="bg-red-50 border border-red-100 rounded p-1 text-center">
+                                        <div className="text-[10px] text-red-500 font-bold">P1</div>
+                                        <div className="font-bold text-red-700">{p1Count}</div>
+                                    </div>
+                                    <div className="bg-yellow-50 border border-yellow-100 rounded p-1 text-center">
+                                        <div className="text-[10px] text-yellow-600 font-bold">P2</div>
+                                        <div className="font-bold text-yellow-700">{p2Count}</div>
+                                    </div>
+                                    <div className="bg-green-50 border border-green-100 rounded p-1 text-center">
+                                        <div className="text-[10px] text-green-600 font-bold">P3</div>
+                                        <div className="font-bold text-green-700">{p3Count}</div>
+                                    </div>
+                                    <div className="bg-gray-50 border border-gray-100 rounded p-1 text-center">
+                                        <div className="text-[10px] text-gray-500 font-bold">TOT</div>
+                                        <div className="font-bold text-gray-700">{total}</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </Card>
+                    </div>
+                </div>
+            );
+        };
 
-                    <Card title="Investigations" icon="file-search">
-                         <div className="grid grid-cols-2 gap-3">
-                             <InvestigationButton type="ECG" icon="activity" label="ECG" isRevealed={investigationsRevealed['ECG']} isLoading={loadingInvestigations['ECG']} revealInvestigation={revealInvestigation} isRunning={isRunning} scenario={scenario}/>
-                             <InvestigationButton type="VBG" icon="droplet" label="VBG" isRevealed={investigationsRevealed['VBG']} isLoading={loadingInvestigations['VBG']} revealInvestigation={revealInvestigation} isRunning={isRunning} scenario={scenario}/>
-                             <InvestigationButton type="CXR" icon="image" label="CXR" isRevealed={investigationsRevealed['CXR']} isLoading={loadingInvestigations['CXR']} revealInvestigation={revealInvestigation} isRunning={isRunning} scenario={scenario}/>
-                             <InvestigationButton type="POCUS" icon="wifi" label="POCUS" isRevealed={investigationsRevealed['POCUS']} isLoading={loadingInvestigations['POCUS']} revealInvestigation={revealInvestigation} isRunning={isRunning} scenario={scenario}/>
-                             <InvestigationButton type="CT" icon="layers" label="CT" isRevealed={investigationsRevealed['CT']} isLoading={loadingInvestigations['CT']} revealInvestigation={revealInvestigation} isRunning={isRunning} scenario={scenario}/>
-                         </div>
-                    </Card>
-
-                    <Card title="Instructor Notes" icon="clipboard">
-                        <form onSubmit={(e) => { e.preventDefault(); if(manualNotes.trim()){ addLogEntry(`Note: ${manualNotes}`, 'note'); setManualNotes(""); } }} className="flex gap-2">
-                            <input 
-                                type="text" 
-                                value={manualNotes}
-                                onChange={(e) => setManualNotes(e.target.value)}
-                                placeholder="Add note..." 
-                                className="flex-grow bg-slate-900 border border-slate-600 rounded px-3 py-3 text-sm focus:outline-none focus:border-purple-500"
-                                disabled={!isRunning}
-                            />
-                            <Button type="submit" variant="secondary" disabled={!isRunning || !manualNotes.trim()} className="h-12">Add</Button>
-                        </form>
-                    </Card>
+        const UserGuide = () => (
+            <div className="space-y-4 text-sm text-gray-700">
+                <div className="flex items-center gap-3 mb-4 border-b pb-4">
+                    <img src={LOGO_URL} className="h-12" />
+                    <div>
+                        <h3 className="font-bold text-lg text-blue-900">Digital Simulation Guide</h3>
+                        <p className="text-xs text-gray-500">WMEBEM Official Training Tool</p>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 className="font-bold text-blue-800 mb-1">1. Objectives</h4>
+                    <ul className="list-disc pl-5 space-y-1 text-xs">
+                        <li>**Triage:** Identify P1 (Red) patients immediately.</li>
+                        <li>**Flow:** Keep the Ambulance Bay clear. Blockage = Failure.</li>
+                        <li>**Treat:** Use AP to stabilise patients. P1s die if untreated.</li>
+                    </ul>
                 </div>
 
-                <div className="space-y-6 flex flex-col h-full order-2 lg:order-2">
-                    
-                    <Card className="flex-grow flex flex-col bg-slate-800 h-96 lg:h-auto">
-                        <div className="flex items-center gap-2 mb-3 border-b border-slate-700 pb-2">
-                            <Lucide icon="list" className="w-5 h-5 text-sky-400" />
-                            <h3 className="font-bold text-slate-200">Incident Log</h3>
-                        </div>
-
-                        <div ref={logContainerRef} className="flex-grow overflow-y-auto space-y-2 pr-2 text-sm font-mono">
-                            {log.length === 0 && <p className="text-slate-500 italic text-center mt-10">Simulation ready...</p>}
-                            {log.map((l, i) => (
-                                <div key={i} className={`p-2 rounded border-l-2 ${l.type === 'success' ? 'bg-emerald-900/20 border-emerald-500' : l.type === 'action' ? 'bg-sky-900/20 border-sky-500' : l.type === 'manual' ? 'bg-purple-900/20 border-purple-500' : l.type === 'note' ? 'bg-yellow-900/20 border-yellow-500' : 'bg-slate-700/30 border-slate-500'}`}>
-                                    <span className="text-xs text-slate-500 block">{l.simTime}</span>
-                                    <p className="text-slate-200">{l.msg}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </Card>
+                <div>
+                    <h4 className="font-bold text-blue-800 mb-1">2. Key Roles (Expanded)</h4>
+                    <ul className="space-y-2 text-xs">
+                        <li className="bg-slate-50 p-2 rounded border-l-4 border-gray-400">
+                            <span className="font-bold block text-gray-800">Command (Silver/Bronze)</span>
+                            Strategic oversight & Triage.
+                        </li>
+                        <li className="bg-blue-50 p-2 rounded border-l-4 border-blue-600">
+                            <span className="font-bold block text-blue-800">Nursing Team</span>
+                            Coordinate (Huddle), Assessment (Stream P3), & Care (Meds/Obs).
+                        </li>
+                        <li className="bg-emerald-50 p-2 rounded border-l-4 border-emerald-500">
+                            <span className="font-bold block text-emerald-800">Medical Team</span>
+                            Procedures, Prescribing & Fast Tracking.
+                        </li>
+                         <li className="bg-purple-50 p-2 rounded border-l-4 border-purple-500">
+                            <span className="font-bold block text-purple-800">Support (Rad/Theatre)</span>
+                            Rapid Diagnostics & Surgical logistics.
+                        </li>
+                        <li className="bg-amber-50 p-2 rounded border-l-4 border-amber-500">
+                            <span className="font-bold block text-amber-800">Logistics (Bed Manager)</span>
+                            Force Discharge (Clear Wards).
+                        </li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 className="font-bold text-blue-800 mb-1">3. Winning Strategy</h4>
+                    <ul className="list-disc pl-5 space-y-1 text-xs">
+                         <li>**Prioritise P1s:** They die if untreated for 1 turn.</li>
+                         <li>**Clear P3s:** Discharge green patients to score points and clear space.</li>
+                         <li>**Use Specialists:** Resus Nurse treats P1s cheaply. Bed Manager clears blocked beds.</li>
+                    </ul>
                 </div>
             </div>
         );
-    };
 
-    const DebriefScreen = ({ sim, onRestart }) => {
-        const { log, scenario, history } = sim; 
-        const chartRef = useRef(null);
+        // FIXED MODAL FOR MOBILE
+        const Modal = ({ title, children, actions }) => (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90dvh] flex flex-col overflow-hidden transform transition-all border border-gray-200">
+                    <div className="bg-slate-50 px-6 py-4 flex justify-between items-center border-b shrink-0">
+                        <h2 className="text-lg font-bold text-slate-800 tracking-wide">{title}</h2>
+                    </div>
+                    <div className="p-6 overflow-y-auto flex-1">
+                        {children}
+                    </div>
+                    <div className="bg-gray-50 px-6 py-4 border-t flex justify-end gap-3 shrink-0">
+                        {actions}
+                    </div>
+                </div>
+            </div>
+        );
 
-        useEffect(() => {
-            if (!chartRef.current || !history.length) return;
-
-            const labels = history.map(h => h.time); 
+        const App = () => {
+            const [gameState, setGameState] = useState('start');
+            const [playerCount, setPlayerCount] = useState(1);
+            const [prefill, setPrefill] = useState(false);
+            const [turn, setTurn] = useState(1);
+            const [score, setScore] = useState(100);
+            const [deaths, setDeaths] = useState(0);
+            const [discharged, setDischarged] = useState(0);
             
-            const hrData = history.map(h => h.hr);
-            const bpData = history.map(h => h.bp);
-            const spo2Data = history.map(h => h.spo2);
-            const rrData = history.map(h => h.rr);
+            const [roleStates, setRoleStates] = useState([]);
+            const [currentRoleId, setCurrentRoleId] = useState(null);
+            
+            const [patients, setPatients] = useState([]);
+            const [selectedPatientId, setSelectedPatientId] = useState(null);
+            const [resources, setResources] = useState({ staff: 15, blood: 20, vents: 8 });
+            
+            const [eventLog, setEventLog] = useState([]);
+            const [modalContent, setModalContent] = useState(null);
 
-            const chart = new window.Chart(chartRef.current, {
-                type: 'line',
-                data: {
-                    labels: labels.map(t => `${Math.floor(t/60)}:${(t%60).toString().padStart(2,'0')}`),
-                    datasets: [
-                        { label: 'HR', data: hrData, borderColor: '#ef4444', tension: 0.4 },
-                        { label: 'Sys BP', data: bpData, borderColor: '#3b82f6', tension: 0.4 },
-                        { label: 'SpO2', data: spo2Data, borderColor: '#10b981', tension: 0.4, yAxisID: 'y1' },
-                        { label: 'RR', data: rrData, borderColor: '#a855f7', tension: 0.4, yAxisID: 'y1' }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        title: { display: true, text: 'Vital Signs Trend' },
-                        tooltip: {
-                            callbacks: {
-                                afterBody: (items) => {
-                                    const idx = items[0].dataIndex;
-                                    const acts = history[idx].actions;
-                                    return acts && acts.length ? `Actions: ${acts.join(', ')}` : '';
-                                }
-                            }
-                        },
-                        annotation: {
-                            annotations: history.reduce((acc, h, i) => {
-                                if (h.actions && h.actions.length) {
-                                    acc[`act_${i}`] = {
-                                        type: 'line',
-                                        xMin: i,
-                                        xMax: i,
-                                        borderColor: 'rgba(255, 165, 0, 0.7)', // Orange color for visibility
-                                        borderWidth: 2,
-                                        label: {
-                                            display: true,
-                                            content: h.actions[0], 
-                                            position: 'start',
-                                            backgroundColor: 'rgba(255, 165, 0, 0.7)',
-                                            color: 'white',
-                                            font: { size: 10 }
-                                        }
-                                    };
-                                }
-                                return acc;
-                            }, {})
-                        }
-                    },
-                    scales: {
-                        y: { position: 'left', min: 0, title: {display:true, text:'HR / BP', color: '#cbd5e1'} },
-                        y1: { position: 'right', min: 0, max: 100, grid: {drawOnChartArea: false}, title: {display:true, text:'SpO2 / RR', color: '#cbd5e1'} },
-                        x: { ticks: { color: '#cbd5e1' } }
+            const currentRole = roleStates.find(r => r.id === currentRoleId);
+            const selectedPatient = patients.find(p => p.uniqueId === selectedPatientId);
+
+            const addLog = (msg) => setEventLog(prev => [`T${turn}: ${msg}`, ...prev]);
+
+            // --- ROLE HELPER ---
+            const getRoleStyle = (type, isSelected) => {
+                let base = "";
+                if (type === 'command') base = isSelected ? "bg-slate-200 border-slate-600 text-slate-900" : "hover:bg-slate-50 border-transparent text-slate-700";
+                if (type === 'nursing') base = isSelected ? "bg-blue-100 border-blue-600 text-blue-900" : "hover:bg-blue-50 border-transparent text-blue-800";
+                if (type === 'medical') base = isSelected ? "bg-emerald-100 border-emerald-600 text-emerald-900" : "hover:bg-emerald-50 border-transparent text-emerald-800";
+                if (type === 'support') base = isSelected ? "bg-purple-100 border-purple-600 text-purple-900" : "hover:bg-purple-50 border-transparent text-purple-800";
+                if (type === 'logistics') base = isSelected ? "bg-amber-100 border-amber-600 text-amber-900" : "hover:bg-amber-50 border-transparent text-amber-800";
+                
+                return `${base} border-l-4`;
+            };
+
+            // --- ACTIONS ---
+
+            const startGame = () => {
+                const initialRoles = ALL_ROLES.map(r => ({ ...r, currentAp: r.ap }));
+                setRoleStates(initialRoles);
+                setCurrentRoleId(initialRoles[0].id);
+                
+                let startLog = [`MAJOR INCIDENT DECLARED. Team size: ${playerCount}`];
+                
+                if (prefill) {
+                    // Prefill Logic
+                    const locs = ['resus', 'majors', 'majors', 'minors', 'minors', 'minors', 'ward', 'ward', 'ward', 'icu'];
+                    const existingPatients = [];
+                    locs.forEach((loc, i) => {
+                        const template = PATIENT_DECK[Math.floor(Math.random() * PATIENT_DECK.length)];
+                        existingPatients.push({
+                            ...template,
+                            ...generateIdentity(),
+                            uniqueId: Date.now() + i + 500,
+                            location: loc,
+                            triaged: true,
+                            treated: Math.random() > 0.5, // 50% chance already treated
+                            turnsUntreated: 0
+                        });
+                    });
+                    setPatients(prev => [...prev, ...existingPatients]);
+                    startLog.push("Department pre-filled with 10 existing patients.");
+                }
+                
+                setEventLog(startLog);
+                spawnPatients(5); 
+                setGameState('playing');
+                setScore(100);
+            };
+
+            const spawnPatients = (count) => {
+                const newPatients = [];
+                for(let i=0; i<count; i++) {
+                    const template = PATIENT_DECK[Math.floor(Math.random() * PATIENT_DECK.length)];
+                    newPatients.push({
+                        ...template,
+                        ...generateIdentity(),
+                        uniqueId: Date.now() + i + Math.random(),
+                        location: 'amb',
+                        triaged: false,
+                        treated: false,
+                        turnsUntreated: 0
+                    });
+                }
+                setPatients(prev => [...prev, ...newPatients]);
+            };
+
+            const handleDrop = (e, targetZoneId) => {
+                e.preventDefault();
+                const patientId = Number(e.dataTransfer.getData("patientId"));
+                const patient = patients.find(p => p.uniqueId === patientId);
+                
+                if (!patient || !currentRole) return;
+                if (currentRole.currentAp < 1) {
+                    alert("No Action Points remaining!");
+                    return;
+                }
+                if (patient.location === targetZoneId) return;
+
+                setRoleStates(prev => prev.map(r => r.id === currentRoleId ? { ...r, currentAp: r.currentAp - 1 } : r));
+                
+                let updates = { location: targetZoneId };
+                // Triage Logic
+                if (['triage', 'resus', 'majors'].includes(targetZoneId)) {
+                    if (!patient.triaged) {
+                        updates.triaged = true;
+                        addLog(`${currentRole.name} Triaged ${patient.name}: ${patient.category}`);
                     }
                 }
-            });
+                
+                if (targetZoneId === 'icu' && resources.vents > 0) {
+                     setResources(prev => ({ ...prev, vents: prev.vents - 1 }));
+                }
 
-            return () => chart.destroy();
-        }, [history]);
+                if (targetZoneId === 'discharged') {
+                    if (patient.treated) {
+                        setScore(s => s + 50);
+                        setDischarged(d => d + 1);
+                        addLog(`${patient.name} discharged.`);
+                    } else {
+                        setScore(s => s - 20);
+                        addLog(`WARNING: ${patient.name} discharged unstable!`);
+                    }
+                }
 
-        const handleExport = () => {
-            const doc = new window.jspdf.jsPDF();
-            doc.setFontSize(18);
-            doc.text(`Simulation Debrief: ${scenario.title}`, 10, 10);
-            doc.setFontSize(12);
-            doc.text(`Scenario ID: ${scenario.id} | Category: ${scenario.category}`, 10, 20);
+                setPatients(prev => prev.map(p => p.uniqueId === patientId ? { ...p, ...updates } : p));
+                setSelectedPatientId(patientId); 
+            };
+
+            const handleTreat = () => {
+                if (!selectedPatient || currentRole.currentAp < 1 || selectedPatient.treated) return;
+                if (selectedPatient.category === 'P1' && resources.blood < 1) {
+                    alert("Not enough Blood products!");
+                    return;
+                }
+
+                setRoleStates(prev => prev.map(r => r.id === currentRoleId ? { ...r, currentAp: r.currentAp - 1 } : r));
+                setPatients(prev => prev.map(p => p.uniqueId === selectedPatientId ? { ...p, treated: true } : p));
+                
+                if (selectedPatient.category === 'P1') {
+                    setResources(prev => ({ ...prev, blood: prev.blood - 1 }));
+                }
+                
+                setScore(s => s + 10);
+                addLog(`${currentRole.name}: ${currentRole.actionText} on ${selectedPatient.name}.`);
+            };
+
+            const useSpecialAbility = () => {
+                if (currentRole.currentAp < currentRole.abilityCost) return;
+
+                setRoleStates(prev => prev.map(r => r.id === currentRoleId ? { ...r, currentAp: r.currentAp - currentRole.abilityCost } : r));
+                addLog(`${currentRole.name} used ${currentRole.ability}`);
+
+                switch(currentRole.id) {
+                    case 'silver': setResources(prev => ({ ...prev, staff: prev.staff + 3 })); break;
+                    case 'bronze': setPatients(prev => prev.map(p => p.location === 'amb' ? { ...p, triaged: true } : p)); break;
+                    case 'nurse_ic': setRoleStates(prev => prev.map(r => r.id !== 'nurse_ic' ? { ...r, currentAp: Math.min(r.ap, r.currentAp + 1) } : r)); break;
+                    case 'nurse_triage': 
+                        const p3Untriaged = patients.find(p => p.location === 'amb' && p.category === 'P3' && !p.triaged);
+                        if(p3Untriaged) {
+                            setPatients(prev => prev.map(p => p.uniqueId === p3Untriaged.uniqueId ? { ...p, location: 'minors', triaged: true } : p));
+                            addLog(`Streamed ${p3Untriaged.name} to Minors`);
+                        }
+                        break;
+                    case 'resident': 
+                        const p3 = patients.find(p => p.location === 'minors' && !p.treated && p.category === 'P3');
+                        if (p3) {
+                            setPatients(prev => prev.map(p => p.uniqueId === p3.uniqueId ? { ...p, treated: true } : p));
+                            addLog(`Fast Tracked ${p3.name}`);
+                        }
+                        break;
+                    case 'radiology':
+                        const needCT = patients.find(p => (p.location === 'resus' || p.location === 'majors') && !p.treated);
+                        if(needCT) {
+                             setPatients(prev => prev.map(p => p.uniqueId === needCT.uniqueId ? { ...p, location: 'ct' } : p));
+                             addLog(`Rapid Scan for ${needCT.name}`);
+                        }
+                        break;
+                    case 'theatre':
+                        const surg = patients.find(p => p.location === 'theatre' && p.treated);
+                        if (surg) setPatients(prev => prev.map(p => p.uniqueId === surg.uniqueId ? { ...p, location: 'icu' } : p));
+                        break;
+                    case 'bed_manager':
+                         setScore(s => s - 5); // penalty for forcing discharge
+                         addLog("Forced Discharge executed. Bed cleared.");
+                         break;
+                }
+            };
+
+            const confirmNextTurn = () => {
+                setModalContent(null);
+                setTurn(t => t + 1);
+                setRoleStates(prev => prev.map(r => ({ ...r, currentAp: r.ap })));
+
+                if (Math.random() > 0.6) {
+                    addLog(`Turn ${turn + 1} Started.`);
+                }
+
+                setPatients(prev => prev.map(p => {
+                    if (p.location === 'morgue' || p.location === 'discharged') return p;
+                    let newP = { ...p };
+                    if (p.category === 'P1' && !p.treated) {
+                        newP.turnsUntreated = (p.turnsUntreated || 0) + 1;
+                        if (newP.turnsUntreated > 1) {
+                            newP.location = 'morgue';
+                            newP.text = "DIED DUE TO DELAYED TREATMENT";
+                            setDeaths(d => d + 1);
+                            setScore(s => s - 100);
+                            addLog(`FATALITY: ${p.name} died awaiting treatment.`);
+                        }
+                    }
+                    return newP;
+                }));
+
+                spawnPatients(Math.floor(Math.random() * 3) + 1);
+            };
             
-            let y = 30;
-            log.forEach(l => {
-                if (y > 280) { doc.addPage(); y = 10; }
-                doc.text(`[${l.simTime}] ${l.msg}`, 10, y);
-                y += 7;
-            });
-            doc.save("sim-debrief.pdf");
-        };
+            const getRoleSuggestion = (count) => {
+                if(count === 1) return "Solo Mode: You control all Command, Nursing, Medical, and Support roles.";
+                if(count === 2) return "P1: Command + Medical | P2: Nursing + Support";
+                if(count === 3) return "P1: Command | P2: Nursing | P3: Medical + Support";
+                if(count >= 4) return "Assign Command, Nursing, Medical, and Support roles to different players.";
+                return "";
+            };
 
-        return (
-            <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn p-2">
-                <div className="flex flex-col md:flex-row justify-between items-center bg-slate-800 p-4 rounded-lg border border-slate-700 gap-4">
-                    <h2 className="text-2xl font-bold text-white">Simulation Debrief</h2>
-                    <div className="flex gap-2 w-full md:w-auto">
-                        <Button onClick={handleExport} variant="secondary" className="flex-1 md:flex-none h-12"><Lucide icon="download"/> Export PDF</Button>
-                        <Button onClick={onRestart} variant="primary" className="flex-1 md:flex-none h-12"><Lucide icon="rotate-ccw"/> New Scenario</Button>
-                    </div>
-                </div>
+            // --- RENDERERS ---
 
-                <Card title="Physiological Trends" icon="activity">
-                    <div className="bg-slate-900 p-4 rounded h-80 relative">
-                        <canvas ref={chartRef}></canvas>
-                    </div>
-                </Card>
-
-                {scenario.learningLinks && scenario.learningLinks.length > 0 && (
-                    <Card title="Guidelines & Evidence" icon="book">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {scenario.learningLinks.map((link, i) => (
-                                <a 
-                                    key={i} 
-                                    href={link.url} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-3 p-4 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded transition-colors group"
-                                >
-                                    <div className="bg-sky-900/50 p-2 rounded text-sky-400 group-hover:text-white group-hover:bg-sky-600 transition-colors">
-                                        <Lucide icon="external-link" className="w-5 h-5"/>
-                                    </div>
-                                    <span className="font-bold text-slate-200 group-hover:text-white text-sm">{link.label}</span>
-                                </a>
-                            ))}
-                        </div>
-                    </Card>
-                )}
-
-                <Card title="Learning Objectives" icon="book-open">
-                    <ul className="list-disc pl-5 space-y-1 text-slate-300">
-                        {scenario.learningObjectives && scenario.learningObjectives.map((o,i) => <li key={i}>{o}</li>)}
-                        {!scenario.learningObjectives && <li>Manage the acute presentation systematically (ABCDE).</li>}
-                        {!scenario.learningObjectives && <li>Recognise and treat life-threatening features.</li>}
-                    </ul>
-                </Card>
-
-                <Card title="Action Timeline" icon="clock">
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                        {log.map((l, i) => (
-                            <div key={i} className="flex gap-4 border-b border-slate-700 pb-2">
-                                <span className="font-mono text-sky-400 w-16 flex-shrink-0">{l.simTime}</span>
-                                <span className="text-slate-300">{l.msg}</span>
+            if (gameState === 'start') {
+                return (
+                    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 overflow-y-auto">
+                        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center border-t-8 border-blue-800 my-auto">
+                            <img src={LOGO_URL} alt="WMEBEM Logo" className="h-24 mx-auto mb-6 object-contain" />
+                            <h1 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">INCIDENT<span className="text-blue-600">COMMAND</span></h1>
+                            <p className="text-slate-500 mb-6 font-medium">WMEBEM Digital Simulation</p>
+                            
+                            <div className="mb-6">
+                                <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Select Team Size</label>
+                                <div className="flex flex-wrap justify-center gap-2 mb-4">
+                                    {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
+                                        <button 
+                                            key={num}
+                                            onClick={() => setPlayerCount(num)}
+                                            className={`w-10 h-10 rounded-xl font-bold text-lg transition-all ${playerCount === num ? 'bg-blue-600 text-white scale-110 shadow-lg' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                                        >
+                                            {num}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 min-h-[60px] flex items-center justify-center">
+                                    <p className="text-xs text-blue-800 font-medium leading-relaxed">
+                                        {getRoleSuggestion(playerCount)}
+                                    </p>
+                                </div>
                             </div>
-                        ))}
-                    </div>
-                </Card>
-            </div>
-        );
-    };
 
-    const App = () => {
-        const [view, setView] = useState('setup'); 
-        const [currentScenario, setCurrentScenario] = useState(null);
-        const [lastSetupParams, setLastSetupParams] = useState(null);
+                            <div className="mb-8 bg-slate-50 p-4 rounded-lg border border-slate-200 text-left">
+                                <label className="flex items-center space-x-3 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={prefill} 
+                                        onChange={(e) => setPrefill(e.target.checked)}
+                                        className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                                    />
+                                    <div>
+                                        <span className="block font-bold text-slate-800">Start with Pre-Filled Department</span>
+                                        <span className="text-xs text-slate-500">Adds 10 patients to wards/clinical areas (Realistic Start)</span>
+                                    </div>
+                                </label>
+                            </div>
 
-        useEffect(() => {
-            if (window.lucide) window.lucide.createIcons();
-        }); 
-
-        const regenerateScenario = () => {
-            if (!lastSetupParams) return;
-            setView('setup_regen'); 
-        };
-
-        return (
-            <div className="min-h-screen flex flex-col p-2 md:p-6 max-w-7xl mx-auto">
-                <header className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
-                    <div className="flex items-center gap-4">
-                        <img src="https://iili.io/KGQOvkl.md.png" alt="WMEBEM Logo" className="h-12 md:h-16 object-contain" />
-                        <div>
-                            <h1 className="text-xl md:text-3xl font-bold text-sky-400">Sim Generator v7.0</h1>
-                            <p className="text-slate-500 text-xs md:text-sm">West Midlands Evidence Based Emergency Medicine</p>
+                            <button onClick={startGame} className="w-full py-4 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all transform active:scale-95">
+                                Start Simulation
+                            </button>
+                            <div className="mt-4 text-xs text-slate-400">
+                                Version 6.6 • WMEBEM
+                            </div>
                         </div>
                     </div>
-                    <div className="hidden md:block text-right">
-                        <p className="text-xs text-slate-600">In-situ Simulation Tool</p>
-                        <p className="text-xs text-slate-600">UK Clinical Guidelines</p>
+                );
+            }
+
+            return (
+                <div className="h-screen flex flex-col bg-slate-100 overflow-hidden">
+                    {/* TOP BAR */}
+                    <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 shrink-0 z-20 shadow-sm">
+                        <div className="flex items-center gap-4">
+                            <img src={LOGO_URL} className="logo-h" />
+                            <div>
+                                <div className="text-xl font-black text-slate-800 leading-none">INCIDENT<span className="text-blue-600">COMMAND</span></div>
+                                <div className="text-[10px] font-bold text-gray-400 tracking-widest uppercase">Turn {turn} • {PHASES[Math.min(2, Math.floor(turn/4))]} • {playerCount} Player Mode</div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                            <button onClick={() => setModalContent('guide')} className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                User Guide
+                            </button>
+                            <div className="h-8 w-px bg-gray-200"></div>
+                            <div className="flex gap-4 text-sm font-bold">
+                                <div className="text-emerald-600 flex flex-col items-center leading-none"><span className="text-xs uppercase text-gray-400">Score</span><span className="text-xl">{score}</span></div>
+                                <div className="text-blue-600 flex flex-col items-center leading-none"><span className="text-xs uppercase text-gray-400">Saved</span><span className="text-xl">{discharged}</span></div>
+                                <div className="text-red-600 flex flex-col items-center leading-none"><span className="text-xs uppercase text-gray-400">Dead</span><span className="text-xl">{deaths}</span></div>
+                            </div>
+                            <button onClick={() => setModalContent('sitrep')} className="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2 rounded-lg font-bold text-sm shadow transition-all">
+                                End Turn →
+                            </button>
+                        </div>
+                    </header>
+
+                    <div className="flex flex-1 overflow-hidden p-4 gap-4">
+                        {/* LEFT: ROLES */}
+                        <div className="w-72 flex flex-col gap-3 shrink-0">
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col min-h-0">
+                                <div className="bg-slate-50 px-4 py-3 border-b border-gray-100 flex justify-between">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Command Staff</h3>
+                                    <span className="text-[10px] text-gray-400 font-bold">{ALL_ROLES.length} Active</span>
+                                </div>
+                                <div className="overflow-y-auto flex-1 p-2 space-y-2">
+                                    {roleStates.map(role => (
+                                        <button 
+                                            key={role.id} 
+                                            onClick={() => { setCurrentRoleId(role.id); setSelectedPatientId(null); }} 
+                                            className={`w-full text-left px-3 py-2 rounded transition-all flex justify-between items-center group shadow-sm ${getRoleStyle(role.type, currentRoleId === role.id)}`}
+                                        >
+                                            <div className="overflow-hidden">
+                                                <div className="font-bold text-xs truncate">{role.name}</div>
+                                                <div className="text-[10px] opacity-70 leading-tight truncate">{role.desc}</div>
+                                            </div>
+                                            <div className={`text-[10px] font-black w-6 h-6 rounded flex items-center justify-center shrink-0 ml-2 ${role.currentAp > 0 ? 'bg-white/50 text-current' : 'bg-gray-200 text-gray-400'}`}>
+                                                {role.currentAp}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            {/* ACTION PANEL */}
+                            <div className="bg-white rounded-xl shadow-md border border-blue-100 p-4 shrink-0">
+                                <h3 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-3">Active: {currentRole?.name}</h3>
+                                <div className="grid gap-2">
+                                    <button onClick={handleTreat} disabled={!selectedPatient || selectedPatient.treated || currentRole.currentAp < 1} className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded font-bold text-sm transition-colors flex items-center justify-center gap-2">
+                                        {currentRole?.actionText} (1 AP)
+                                    </button>
+                                    <button onClick={useSpecialAbility} disabled={currentRole.currentAp < currentRole.abilityCost} className="w-full py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded font-bold text-sm transition-colors flex items-center justify-center gap-2">
+                                        {currentRole.ability} ({currentRole.abilityCost} AP)
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* RESOURCES */}
+                            <div className="bg-slate-800 rounded-xl p-4 text-white shrink-0">
+                                <div className="grid grid-cols-3 gap-2 text-center">
+                                    <div className="bg-slate-700/50 rounded p-1"><div className="text-[10px] text-slate-400 uppercase">Staff</div><div className="font-bold text-lg text-blue-300">{resources.staff}</div></div>
+                                    <div className="bg-slate-700/50 rounded p-1"><div className="text-[10px] text-slate-400 uppercase">Blood</div><div className="font-bold text-lg text-red-400">{resources.blood}</div></div>
+                                    <div className="bg-slate-700/50 rounded p-1"><div className="text-[10px] text-slate-400 uppercase">Vents</div><div className="font-bold text-lg text-emerald-400">{resources.vents}</div></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* CENTER: BOARD */}
+                        <div className="flex-1 bg-white rounded-2xl shadow-inner border border-gray-200 overflow-hidden flex flex-col relative">
+                            <div className="flex-1 overflow-y-auto p-4 relative z-10 custom-scrollbar">
+                                <div className="grid grid-cols-4 gap-4 h-full auto-rows-min">
+                                    {/* Row 1: Intake (Taller single column) */}
+                                    <div className="col-span-1 row-span-2 h-[620px]"><ZoneDisplay zone={ZONES[0]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    
+                                    {/* Clinical */}
+                                    <div className="col-span-1 h-[300px]"><ZoneDisplay zone={ZONES[1]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-1 h-[300px]"><ZoneDisplay zone={ZONES[2]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-1 h-[300px]"><ZoneDisplay zone={ZONES[3]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    
+                                    {/* Treatment & Flow */}
+                                    <div className="col-span-2 h-[300px]"><ZoneDisplay zone={ZONES[4]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-1 h-[300px]"><ZoneDisplay zone={ZONES[5]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+
+                                    {/* Wards & Exit */}
+                                    <div className="col-span-1 h-[200px]"><ZoneDisplay zone={ZONES[6]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-1 h-[200px]"><ZoneDisplay zone={ZONES[7]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-2 h-[200px]"><ZoneDisplay zone={ZONES[8]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-2 h-[200px]"><ZoneDisplay zone={ZONES[10]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                    <div className="col-span-2 h-[200px]"><ZoneDisplay zone={ZONES[9]} patients={patients} onPatientSelect={(p)=>setSelectedPatientId(p.uniqueId)} selectedPatientId={selectedPatientId} onDrop={handleDrop} onDragOver={e=>e.preventDefault()} /></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* RIGHT: INFO & LOGS */}
+                        <div className="w-64 flex flex-col gap-4 shrink-0">
+                            <div className="h-1/2 bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col">
+                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Patient Detail</h3>
+                                {selectedPatient ? (
+                                    <div className="flex-1 overflow-y-auto">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <StickFigure injuryLoc={selectedPatient.injuryLoc} />
+                                            <div>
+                                                <div className="font-bold text-lg leading-none">{selectedPatient.name}</div>
+                                                <div className="text-xs text-gray-500 mt-1">{selectedPatient.age} {selectedPatient.gender}</div>
+                                                <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded">{selectedPatient.id}</span>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <div className="bg-slate-50 p-2 rounded border border-slate-100">
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase">Condition</div>
+                                                <p className="text-sm text-slate-700 font-medium leading-snug">{selectedPatient.text}</p>
+                                            </div>
+                                            <VitalsDisplay vitals={selectedPatient.vitals} />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex-1 flex items-center justify-center text-gray-300 text-sm italic">Select a patient</div>
+                                )}
+                            </div>
+                            <div className="h-1/2 bg-slate-900 rounded-xl shadow-inner p-3 flex flex-col overflow-hidden">
+                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Incident Log</div>
+                                <div className="flex-1 overflow-y-auto space-y-1 font-mono text-[10px] text-emerald-400/90 custom-scrollbar">
+                                    {eventLog.map((l, i) => <div key={i} className="border-b border-slate-800 pb-1">{l}</div>)}
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </header>
 
-                <main className="flex-grow">
-                    {view === 'setup' && (
-                        <SetupScreen onGenerate={(s, params) => { 
-                            setCurrentScenario(s); 
-                            setLastSetupParams(params); 
-                            setView('briefing'); 
-                        }} />
+                    {/* FOOTER */}
+                    <footer className="bg-white border-t border-gray-200 p-2 text-[10px] text-gray-500 flex justify-between items-center shrink-0">
+                        <div className="flex gap-4">
+                            <span>© 2025 WMEBEM. Licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">CC BY-NC-SA 4.0</a>.</span>
+                            <span>Free to use and modify with attribution.</span>
+                        </div>
+                        <div className="flex gap-4">
+                            <a href="https://www.england.nhs.uk/ourwork/eprr/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">NHS England EPRR</a>
+                            <span>•</span>
+                            <a href="https://www.england.nhs.uk/publication/clinical-guidelines-for-major-incidents-and-mass-casualty-events/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">Clinical Guidelines</a>
+                            <span>•</span>
+                            <a href="https://www.england.nhs.uk/wp-content/uploads/2018/12/B0128-clinical-guidelines-for-use-in-a-major-incident-v2-2020.pdf" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">Download PDF</a>
+                        </div>
+                    </footer>
+
+                    {/* MODALS */}
+                    {modalContent === 'sitrep' && (
+                        <Modal title={`Turn ${turn} Command SITREP`} actions={<button onClick={confirmNextTurn} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold shadow-lg">Submit & Next Turn</button>}>
+                            <SitrepForm turn={turn} patients={patients} />
+                        </Modal>
                     )}
-
-                    {view === 'setup_regen' && (
-                        <SetupScreen 
-                            initialParams={{ ...lastSetupParams, autoGenerate: true }}
-                            onGenerate={(s, params) => { 
-                                setCurrentScenario(s); 
-                                setLastSetupParams(params); 
-                                setView('briefing'); 
-                            }} 
-                        />
+                    {modalContent === 'guide' && (
+                        <Modal title="WMEBEM Simulation Guide" actions={<button onClick={() => setModalContent(null)} className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded font-bold shadow-lg">Close Guide</button>}>
+                            <UserGuide />
+                        </Modal>
                     )}
-                    
-                    {view === 'briefing' && currentScenario && (
-                        <BriefingScreen 
-                            scenario={currentScenario} 
-                            onStart={() => setView('live')} 
-                            onBack={() => setView('setup')}
-                            onNewScenario={regenerateScenario}
-                        />
-                    )}
+                </div>
+            );
+        };
 
-                    {(view === 'live' || view === 'debrief') && currentScenario && (
-                        <LiveSimContainer 
-                            scenario={currentScenario} 
-                            view={view} 
-                            setView={setView} 
-                            onRestart={() => { setCurrentScenario(null); setView('setup'); }}
-                        />
-                    )}
-                </main>
-
-                <footer className="mt-12 text-center text-slate-600 text-xs py-4 border-t border-slate-800">
-                    <p>© {new Date().getFullYear()} WMEBEM (West Midlands Evidence Based Emergency Medicine). All rights reserved.</p>
-                    <p className="mt-1">This tool is for educational simulation purposes only and should not be used for live clinical decision making. Content can be used or modified with permission.</p>
-                </footer>
-            </div>
-        );
-    };
-
-    const LiveSimContainer = ({ scenario, view, setView, onRestart }) => {
-        const sim = useSimulation(scenario);
-
-        if (view === 'live') return <LiveSimScreen sim={sim} onFinish={() => { sim.stop(); setView('debrief'); }} onBack={() => setView('briefing')} />;
-        if (view === 'debrief') return <DebriefScreen sim={sim} onRestart={onRestart} />;
-        return null;
-    };
-
-    ReactDOM.render(<App />, document.getElementById('root'));
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
