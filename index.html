@@ -136,8 +136,6 @@
 
         // --- CONSTANTS ---
         const LOGO_URL = "https://iili.io/KGQOvkl.md.png";
-        
-        // --- EVENTS ---
         const RANDOM_EVENTS = [
             { id: 'needlestick', title: 'Needlestick Injury', desc: 'A Nurse has sustained a needlestick injury and must report to Occ Health.', effect: 'One Nurse removed for 1 turn.' },
             { id: 'ct_overheat', title: 'Scanner Overheat', desc: 'The CT Scanner cooling system has failed.', effect: 'CT Scanner disabled for this turn.' },
@@ -146,15 +144,12 @@
             { id: 'rapid_offload', title: 'Rapid Offload', desc: 'Multiple ambulances arrive at once.', effect: '3 Extra Patients added to Ambulance Bay.' },
             { id: 'it_failure', title: 'IT Systems Failure', desc: 'EPR is down. We are on paper.', effect: 'Triage costs 2 AP this turn.' }
         ];
-
         const SCENARIOS = {
             standard: { name: "Standard Incident", desc: "A major incident has been declared. Balanced mix of trauma and medical casualties.", p1: 0.2, p2: 0.3, p3: 0.5 },
             chemical: { name: "Chemical Attack", desc: "CBRN incident. High number of airway risks (P1) requiring advanced skills.", p1: 0.5, p2: 0.3, p3: 0.2, type: 'chem' },
             bus_crash: { name: "Bus Crash", desc: "Multi-vehicle collision. High volume of blunt trauma (Head/Chest/Abdo).", p1: 0.3, p2: 0.4, p3: 0.3, type: 'trauma' },
             collapse: { name: "Structural Collapse", desc: "Building collapse. Crush injuries and dust inhalation.", p1: 0.25, p2: 0.4, p3: 0.35, type: 'crush' }
         };
-
-        // Role Templates
         const ROLE_TEMPLATES = {
             bronze_cmd: { type: 'command', theme: 'slate', icon: Activity, name: 'Bronze Commander', ap: 4, desc: 'Operational Lead', ability: 'Emergency Resupply', abilityCost: 2, abilityEffect: '+2 Blood / +1 Vent', actionText: 'Review', canTriage: true, skills: ['triage', 'care'] },
             senior_doc: { type: 'command', theme: 'slate', icon: ClipboardCheck, name: 'Senior Doctor', ap: 5, desc: 'Clinical Lead', ability: 'Rapid Triage', abilityCost: 2, abilityEffect: 'Reveal All Intake', actionText: 'Review', canTriage: true, canTreat: true, skills: ['advanced_trauma', 'care', 'triage'] },
@@ -164,7 +159,6 @@
             radiology: { type: 'support', theme: 'purple', icon: Scan, name: 'Radiology Lead', ap: 3, desc: 'Diagnostics', ability: 'Rapid Scan', abilityCost: 1, abilityEffect: 'Move to CT Free', actionText: 'Scan', canScan: true, skills: [] },
             bed_manager: { type: 'logistics', theme: 'amber', icon: Bed, name: 'Bed Manager', ap: 3, desc: 'Flow', ability: 'Force Discharge', abilityCost: 1, abilityEffect: 'Clear Ward Bed', actionText: 'Breach', skills: [] }
         };
-
         const generateRoster = (counts) => {
             const roles = [];
             roles.push({ id: 'bronze_cmd', ...ROLE_TEMPLATES.bronze_cmd });
@@ -176,7 +170,6 @@
             for (let i = 0; i < counts.nurse; i++) roles.push({ id: `nurse_staff_${i}`, ...ROLE_TEMPLATES.nurse_staff, name: counts.nurse > 1 ? `ED Nurse ${i+1}` : 'ED Nurse' });
             return roles;
         };
-
         const ZONES = [
             { id: 'amb', name: 'Ambulance Bay', capacity: 12, type: 'intake' },
             { id: 'triage', name: 'Triage', capacity: 10, type: 'process' },
@@ -190,7 +183,6 @@
             { id: 'discharged', name: 'Home', capacity: 999, type: 'exit' },
             { id: 'morgue', name: 'Mortuary', capacity: 999, type: 'exit' }
         ];
-
         const getPatientNeeds = (p) => {
             const needs = [];
             if (!p.triaged) needs.push({ id: 'triage', label: 'Triage', icon: ClipboardCheck, color: 'text-slate-600', bg: 'bg-slate-100', borderColor: 'border-slate-300' });
@@ -207,7 +199,6 @@
             }
             return needs;
         };
-
         const getColorStyle = (theme) => ({
             slate: 'border-slate-500 hover:bg-slate-50 text-slate-800',
             blue: 'border-blue-500 hover:bg-blue-50 text-blue-800',
@@ -215,7 +206,6 @@
             purple: 'border-purple-500 hover:bg-purple-50 text-purple-800',
             amber: 'border-amber-500 hover:bg-amber-50 text-amber-800'
         }[theme] || 'border-gray-500');
-
         const getActiveStyle = (theme) => ({
             slate: 'bg-slate-800 text-white border-slate-800',
             blue: 'bg-blue-700 text-white border-blue-700',
@@ -224,40 +214,179 @@
             amber: 'bg-amber-700 text-white border-amber-700'
         }[theme] || 'bg-gray-800');
 
-        // --- SUB COMPONENTS ---
+        // --- COMPONENTS ---
+        const StickFigure = ({ injuryLoc, className }) => ( <svg viewBox="0 0 100 100" className={`overflow-visible ${className}`}><circle cx="50" cy="15" r="12" fill="none" stroke="currentColor" strokeWidth="6" /><line x1="50" y1="27" x2="50" y2="60" stroke="currentColor" strokeWidth="6" /><line x1="50" y1="35" x2="20" y2="50" stroke="currentColor" strokeWidth="6" /><line x1="50" y1="35" x2="80" y2="50" stroke="currentColor" strokeWidth="6" /><line x1="50" y1="60" x2="30" y2="95" stroke="currentColor" strokeWidth="6" /><line x1="50" y1="60" x2="70" y2="95" stroke="currentColor" strokeWidth="6" />{injuryLoc === 'head' && <circle cx="50" cy="15" r="15" stroke="#ef4444" strokeWidth="4" fill="none" className="animate-pulse" />}{injuryLoc === 'chest' && <circle cx="50" cy="40" r="12" stroke="#ef4444" strokeWidth="4" fill="none" className="animate-pulse" />}{injuryLoc === 'abdo' && <circle cx="50" cy="55" r="10" stroke="#ef4444" strokeWidth="4" fill="none" className="animate-pulse" />}{injuryLoc === 'arm' && <circle cx="20" cy="50" r="8" stroke="#ef4444" strokeWidth="4" fill="none" className="animate-pulse" />}{injuryLoc === 'leg' && <circle cx="30" cy="90" r="8" stroke="#ef4444" strokeWidth="4" fill="none" className="animate-pulse" />}</svg>);
+        
+        const VitalsDisplay = ({ vitals, isTriaged }) => {
+            if (!isTriaged) return <div className="text-slate-400 text-[10px] italic text-center py-2 bg-slate-800/20 rounded">Vitals obscured pending triage</div>;
+            const getVitalClass = (val, type) => {
+                if (type === 'hr') return (val > 120 || val < 50) ? 'vital-red' : (val > 100 ? 'vital-amber' : 'vital-normal');
+                if (type === 'sbp') return (val < 90) ? 'vital-red' : (val < 100 ? 'vital-amber' : 'vital-normal');
+                if (type === 'rr') return (val > 30 || val < 10) ? 'vital-red' : (val > 22 ? 'vital-amber' : 'vital-normal');
+                return 'text-slate-400';
+            };
+            return ( <div className="grid grid-cols-4 gap-2 text-[12px] font-mono bg-slate-900/50 p-2 rounded border border-slate-700/50"><div className="text-center"><span className="text-slate-500 block text-[9px] uppercase">HR</span><span className={`text-base font-bold ${getVitalClass(vitals.hr, 'hr')}`}>{vitals.hr}</span></div><div className="text-center"><span className="text-slate-500 block text-[9px] uppercase">BP</span><span className={`text-base font-bold ${getVitalClass(vitals.sbp, 'sbp')}`}>{vitals.sbp}</span></div><div className="text-center"><span className="text-slate-500 block text-[9px] uppercase">RR</span><span className={`text-base font-bold ${getVitalClass(vitals.rr, 'rr')}`}>{vitals.rr}</span></div><div className="text-center"><span className="text-slate-500 block text-[9px] uppercase">SpO2</span><span className={`text-base font-bold ${getVitalClass(vitals.spo2, 'spo2')}`}>{vitals.spo2}%</span></div></div> );
+        };
 
-        const RoleKey = () => {
-            const uniqueRoles = Object.values(ROLE_TEMPLATES);
+        const PatientCard = ({ patient, onSelect, isSelected, onDragStart, isTutorialTarget }) => {
+            const needs = getPatientNeeds(patient);
+            const getColorClass = (cat) => {
+                if (!patient.triaged) return "neutral-bg";
+                if(cat === 'P1') return "p1-bg"; if(cat === 'P2') return "p2-bg"; if(cat === 'P3') return "p3-bg"; return "dead-bg";
+            };
+            const isRevealed = patient.location !== 'amb' || patient.triaged;
             return (
-                <div className="space-y-2">
-                    {uniqueRoles.map(role => {
-                        const RoleIcon = role.icon;
-                        return (
-                            <div key={role.name} className={`flex items-start gap-3 p-3 rounded border ${getColorStyle(role.theme)} bg-white`}>
-                                <div className={`p-2 rounded bg-${role.theme}-100 text-${role.theme}-700 shrink-0`}><RoleIcon size={20} /></div>
-                                <div className="flex-1">
-                                    <div className="flex justify-between items-center mb-1"><h4 className="font-bold text-sm">{role.name}</h4><span className="text-[10px] font-bold uppercase tracking-wider bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">{role.type}</span></div>
-                                    <p className="text-xs text-gray-600 mb-2">{role.desc}</p>
-                                    <div className="grid grid-cols-2 gap-2 text-[10px]"><div className="bg-gray-50 p-1.5 rounded border"><span className="font-bold block text-gray-500">Primary Action</span>{role.actionText}</div><div className="bg-gray-50 p-1.5 rounded border"><span className="font-bold block text-gray-500">Special Ability ({role.abilityCost} AP)</span>{role.ability}: {role.abilityEffect}</div></div>
-                                </div>
-                            </div>
-                        );
-                    })}
+                <div draggable onDragStart={(e) => onDragStart(e, patient.uniqueId)} onClick={(e) => { e.stopPropagation(); onSelect(patient.uniqueId); }} className={`p-2 rounded-md shadow-sm border cursor-pointer mb-2 transition-all relative group ${getColorClass(patient.category)} ${isSelected ? 'ring-4 ring-blue-500 ring-offset-1 scale-105 z-10' : 'hover:scale-[1.02] border-black/10'} ${isTutorialTarget ? 'tutorial-highlight' : ''}`}>
+                    <div className="flex justify-between items-start mb-1"><span className="font-black text-slate-900 text-xs truncate w-24">{patient.name}</span>{isRevealed ? ( <span className="px-1.5 bg-white/90 rounded text-[10px] font-black border border-black/10 shadow-sm">{patient.category}</span> ) : ( <span className="px-1.5 bg-gray-200 rounded text-[10px] font-bold text-gray-500">?</span> )}</div>
+                    {isRevealed ? ( <div className="text-[9px] leading-tight text-slate-700 h-8 line-clamp-2 mb-1 font-medium">{patient.text}</div> ) : ( <div className="text-[9px] text-slate-500 italic h-8 flex items-center justify-center bg-black/5 rounded mb-1">Awaiting Triage...</div> )}
+                    <div className="flex gap-1 mt-1 border-t border-black/5 pt-1 min-h-[16px]">{needs.map((n, i) => { const Icon = n.icon; return ( <div key={i} className={`rounded-full p-0.5 border ${n.bg} ${n.color} ${n.borderColor}`} title={n.label}><Icon size={10} strokeWidth={2.5} /></div> ); })}{patient.treated && <div className="bg-emerald-100 text-emerald-700 rounded-full p-0.5"><Check size={10} strokeWidth={3} /></div>}</div>
                 </div>
             );
         };
 
-        const Counter = ({ label, value, onChange, min, max }) => (
-            <div className="flex justify-between items-center bg-slate-50 p-3 rounded border border-slate-200"><span className="text-sm font-bold text-slate-700">{label}</span><div className="flex items-center gap-3"><button type="button" onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} className="w-8 h-8 rounded bg-white border flex items-center justify-center hover:bg-slate-100 disabled:opacity-50 text-slate-600 cursor-pointer"><Minus size={16}/></button><span className="w-6 text-center font-bold">{value}</span><button type="button" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} className="w-8 h-8 rounded bg-white border flex items-center justify-center hover:bg-slate-100 disabled:opacity-50 text-slate-600 cursor-pointer"><Plus size={16}/></button></div></div>
+        // Define ZoneDisplay BEFORE App uses it
+        const ZoneDisplay = ({ zone, patients, onSelect, selectedPatientId, onDrop, onZoneClick, activeEvent, isTutorialTarget }) => {
+            const zPatients = patients.filter(p => p.location === zone.id);
+            const isBlocked = activeEvent?.id === 'ct_overheat' && zone.id === 'ct';
+            let cap = zone.capacity;
+            if (activeEvent?.id === 'norovirus' && zone.id === 'ward') cap -= 5;
+            const percent = Math.min(100, (zPatients.length / cap) * 100);
+            let barColor = 'bg-emerald-500';
+            if (percent > 50) barColor = 'bg-amber-500';
+            if (percent > 80) barColor = 'bg-red-500';
+            if (isBlocked) barColor = 'bg-slate-400';
+
+            const handleClick = () => {
+                if (!isBlocked && selectedPatientId && onZoneClick) onZoneClick(zone.id);
+            };
+
+            return (
+                <div onDragOver={e => !isBlocked && e.preventDefault()} onDrop={e => !isBlocked && onDrop(e, zone.id)} onClick={handleClick}
+                    className={`bg-white border rounded-lg flex flex-col shadow-sm overflow-hidden zone-card ${selectedPatientId ? 'dimmed cursor-pointer ring-2 ring-blue-400 ring-opacity-50' : ''} ${isBlocked ? 'opacity-50 pointer-events-none bg-slate-100' : ''} ${isTutorialTarget ? 'tutorial-highlight' : ''} h-full relative`}>
+                    {isBlocked && <div className="absolute inset-0 flex items-center justify-center bg-slate-200/80 z-10 font-bold text-slate-500 text-xs uppercase tracking-widest">Out of Order</div>}
+                    <div className="px-3 py-1.5 border-b flex justify-between items-center bg-white/50">
+                        <span className="font-bold text-[10px] uppercase text-slate-500">{zone.name}</span>
+                        <span className={`text-[10px] font-bold px-1.5 rounded ${zPatients.length > cap ? 'bg-red-100 text-red-600' : 'bg-slate-100'}`}>{zPatients.length}/{cap}</span>
+                    </div>
+                    <div className="h-1 w-full bg-slate-100"><div className={`h-full transition-all duration-500 ${barColor}`} style={{ width: `${percent}%` }}></div></div>
+                    <div className="p-2 flex-1 overflow-y-auto min-h-[80px]">
+                        {zPatients.map(p => ( <PatientCard key={p.uniqueId} patient={p} isSelected={selectedPatientId === p.uniqueId} onSelect={onSelect} onDragStart={(e, id) => e.dataTransfer.setData("patientId", id)} isTutorialTarget={isTutorialTarget && p.uniqueId === 99999} /> ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const ActionHUD = ({ patient, role, onAction, onAbility, onClose, resources, time, activeEvent, tutorialStep, isActiveTriage }) => {
+            if (!patient) return null;
+            const needs = getPatientNeeds(patient);
+            const triageCost = activeEvent?.id === 'it_failure' ? 2 : 1;
+            const canTriage = needs.some(n => n.id === 'triage') && role.canTriage;
+            const canScan = needs.some(n => n.id === 'scan') && role.canScan && activeEvent?.id !== 'ct_overheat';
+            const canTreat = needs.some(n => n.id === 'treat') && role.canTreat && (!patient.reqSkill || role.skills.includes(patient.reqSkill));
+            let mainActionText = "No Action"; let isMainActionEnabled = false; let mainActionColor = "bg-slate-600";
+            let highlightAction = false;
+
+            if (canTriage) { 
+                mainActionText = `Triage (${triageCost} AP)`; isMainActionEnabled = true; mainActionColor = "bg-blue-600 hover:bg-blue-500"; 
+                if(tutorialStep === 4) highlightAction = true;
+                if(isActiveTriage) mainActionText = `Assess & Triage (${triageCost} AP)`;
+            }
+            else if (canScan) { mainActionText = "Perform CT Scan"; isMainActionEnabled = true; mainActionColor = "bg-purple-600 hover:bg-purple-500"; }
+            else if (canTreat) { 
+                mainActionText = patient.treatmentAction || `Treat (${role.actionText})`; 
+                isMainActionEnabled = true; 
+                mainActionColor = "bg-emerald-600 hover:bg-emerald-500"; 
+                if(tutorialStep === 7) highlightAction = true;
+            }
+            else if (needs.some(n => n.id === 'scan')) { mainActionText = activeEvent?.id === 'ct_overheat' ? "Scanner Broken" : "Needs CT Scan First"; mainActionColor = "bg-slate-700 text-slate-400"; }
+            else if (needs.some(n => n.id === 'treat')) { mainActionText = patient.reqSkill === 'advanced_trauma' ? "Requires Doctor (Trauma)" : "Requires Clinical Role"; mainActionColor = "bg-slate-700 text-slate-400"; }
+            else if (patient.treated) { mainActionText = "Patient Stable"; mainActionColor = "bg-emerald-800 text-emerald-200"; }
+
+            return (
+                <div className="fixed bottom-0 left-0 right-0 bg-slate-900 text-white border-t border-slate-700 shadow-2xl z-50 hud-enter flex flex-col lg:flex-row h-auto lg:h-[240px] max-h-[50vh]">
+                    <div className="p-4 flex items-center gap-4 border-b lg:border-b-0 lg:border-r border-slate-700 w-full lg:w-1/3 bg-slate-800/50 shrink-0">
+                        <StickFigure injuryLoc={patient.injuryLoc} className="h-16 w-16 lg:h-20 lg:w-20 text-slate-300" />
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1"><span className={`text-xs font-black px-2 py-0.5 rounded text-slate-900 ${patient.triaged ? (patient.category === 'P1' ? 'bg-red-300' : patient.category === 'P2' ? 'bg-amber-300' : 'bg-green-300') : 'bg-gray-200'}`}>{patient.triaged ? patient.category : 'Unknown'}</span><h2 className="text-lg lg:text-xl font-bold truncate">{patient.name}</h2></div>
+                            <p className="text-slate-400 text-xs mb-2">{patient.age} {patient.gender} • {patient.triaged ? patient.text : 'Awaiting Triage...'}</p>
+                            <VitalsDisplay vitals={patient.vitals} isTriaged={patient.triaged || isActiveTriage} />
+                        </div>
+                        <button onClick={onClose} className="lg:hidden p-2 text-slate-500 hover:text-white"><X size={20}/></button>
+                    </div>
+                    <div className="p-4 flex-1 border-b lg:border-b-0 lg:border-r border-slate-700 bg-slate-900 overflow-y-auto min-h-[100px]">
+                        <div className="flex justify-between items-center mb-2"><div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Clinical Notes</div><div className="flex gap-2">{needs.length === 0 && <div className="text-emerald-400 text-[10px] font-bold flex items-center gap-1"><CheckCircle size={12}/> Ready</div>}{needs.map((n, i) => { const Icon = n.icon; return ( <div key={i} className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] font-bold ${n.bg} ${n.color} ${n.borderColor}`}><Icon size={10} /><span>{n.label}</span></div> ); })}</div></div>
+                        <div className="space-y-1">{patient.history && patient.history.length > 0 ? ( patient.history.map((entry, idx) => ( <div key={idx} className="text-[10px] font-mono flex gap-2 text-slate-300 border-b border-slate-800 pb-1"><span className="text-slate-500">{entry.time}</span><span>{entry.msg}</span></div> )) ) : ( <div className="text-[10px] text-slate-600 italic">No clinical history recorded.</div> )}</div>
+                    </div>
+                    <div className="p-4 w-full lg:w-1/3 flex flex-col gap-2 bg-slate-800/30 shrink-0">
+                        <div className="flex justify-between items-center text-[10px] text-slate-400 uppercase font-bold mb-1"><span>Role: {role.name}</span><span>AP: {role.currentAp}/{role.ap}</span></div>
+                        <button onClick={onAction} disabled={!isMainActionEnabled || role.currentAp < (activeEvent?.id === 'it_failure' && canTriage ? 2 : 1)} className={`flex-1 py-3 rounded font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2 ${mainActionColor} disabled:opacity-50 disabled:cursor-not-allowed ${highlightAction ? 'tutorial-highlight' : ''}`}>{canTriage && <ClipboardCheck size={16} />}{canScan && <Scan size={16} />}{canTreat && <Stethoscope size={16} />}{mainActionText}{isMainActionEnabled && <span className="bg-black/20 px-1.5 rounded text-[10px]">{activeEvent?.id === 'it_failure' && canTriage ? '2' : '1'} AP</span>}</button>
+                        <button onClick={onAbility} disabled={role.currentAp < role.abilityCost} className="py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded font-bold text-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50"><ShieldAlert size={14} />{role.ability}: {role.abilityEffect}<span className="bg-black/20 px-1.5 rounded text-[10px]">{role.abilityCost} AP</span></button>
+                    </div>
+                    <button onClick={onClose} className="absolute top-0 right-0 p-2 text-slate-500 hover:text-white hidden lg:block"><X size={16}/></button>
+                </div>
+            );
+        };
+
+        const EventModal = ({ event, onClose }) => (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border-l-8 border-amber-500">
+                    <div className="p-6">
+                        <div className="flex items-center gap-3 mb-4 text-amber-600"><AlertTriangle size={32} /><h2 className="text-2xl font-black uppercase tracking-tight">Incident Update</h2></div>
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">{event.title}</h3>
+                        <p className="text-slate-600 mb-4">{event.desc}</p>
+                        <div className="bg-amber-50 border border-amber-200 p-3 rounded text-sm font-bold text-amber-800">Effect: {event.effect}</div>
+                    </div>
+                    <button onClick={onClose} className="w-full bg-slate-900 hover:bg-slate-800 text-white py-4 font-bold text-lg transition-colors">ACKNOWLEDGE</button>
+                </div>
+            </div>
         );
-        
-        const TutorialOverlay = ({ step, children }) => (
-             <div className="fixed inset-0 pointer-events-none z-[60] flex items-center justify-center bg-black/20">
-                 <div className="bg-white p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] max-w-md text-center border-4 border-yellow-400 pointer-events-auto animate-bounce transform -translate-y-12">
-                     <div className="flex items-center justify-center gap-2 mb-2 text-yellow-600 font-black uppercase tracking-wide text-sm"><Lightbulb size={20} /> Tutorial Step {step}/9</div>
-                     <div className="text-slate-900 font-bold text-lg leading-tight">{children}</div>
-                 </div>
-             </div>
+
+        const TriageModal = ({ patient, onClose, onConfirm }) => {
+            if (!patient) return null;
+            return (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border-t-8 border-blue-500">
+                        <div className="p-6">
+                            <h2 className="text-xl font-black text-slate-900 mb-4 uppercase tracking-wide">Triage Assessment</h2>
+                            <div className="bg-slate-100 p-3 rounded mb-4 border border-slate-200">
+                                <div className="text-xs font-bold text-slate-500 uppercase mb-1">Presentation</div>
+                                <div className="text-sm font-bold text-slate-800">{patient.text}</div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mb-6">
+                                <div className="bg-white border p-2 rounded text-center"><div className="text-[10px] text-slate-400 uppercase">HR</div><div className={`font-mono font-bold ${patient.vitals.hr > 120 || patient.vitals.hr < 50 ? 'text-red-600' : 'text-slate-800'}`}>{patient.vitals.hr}</div></div>
+                                <div className="bg-white border p-2 rounded text-center"><div className="text-[10px] text-slate-400 uppercase">BP</div><div className={`font-mono font-bold ${patient.vitals.sbp < 90 ? 'text-red-600' : 'text-slate-800'}`}>{patient.vitals.sbp}</div></div>
+                                <div className="bg-white border p-2 rounded text-center"><div className="text-[10px] text-slate-400 uppercase">RR</div><div className={`font-mono font-bold ${patient.vitals.rr > 30 || patient.vitals.rr < 10 ? 'text-red-600' : 'text-slate-800'}`}>{patient.vitals.rr}</div></div>
+                                 <div className="bg-white border p-2 rounded text-center"><div className="text-[10px] text-slate-400 uppercase">SpO2</div><div className={`font-mono font-bold ${patient.vitals.spo2 < 90 ? 'text-red-600' : 'text-slate-800'}`}>{patient.vitals.spo2}%</div></div>
+                            </div>
+                            <p className="text-xs text-slate-500 mb-2 text-center font-bold uppercase">Select Priority Category</p>
+                            <div className="grid grid-cols-3 gap-3">
+                                <button onClick={() => onConfirm('P1')} className="py-3 bg-red-100 hover:bg-red-200 text-red-800 font-black rounded border border-red-200 transition-colors">P1</button>
+                                <button onClick={() => onConfirm('P2')} className="py-3 bg-amber-100 hover:bg-amber-200 text-amber-800 font-black rounded border border-amber-200 transition-colors">P2</button>
+                                <button onClick={() => onConfirm('P3')} className="py-3 bg-green-100 hover:bg-green-200 text-green-800 font-black rounded border border-green-200 transition-colors">P3</button>
+                            </div>
+                        </div>
+                        <div className="bg-gray-50 px-6 py-3 border-t flex justify-end">
+                            <button onClick={onClose} className="text-sm font-bold text-slate-500 hover:text-slate-800">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const GameOver = ({ reason, stats, onRestart }) => (
+            <div className="fixed inset-0 bg-slate-900 flex items-center justify-center z-[100] p-4 animate-fade-in text-white">
+                <div className="max-w-lg w-full text-center">
+                    <div className="mb-6 inline-block p-4 rounded-full bg-red-600/20 text-red-500"><ShieldAlert size={64} /></div>
+                    <h1 className="text-4xl font-black mb-2 text-red-500 tracking-tight">CRITICAL FAILURE</h1>
+                    <p className="text-xl text-slate-400 mb-8">{reason}</p>
+                    <div className="grid grid-cols-3 gap-4 mb-8">
+                        <div className="bg-slate-800 p-4 rounded-xl"><div className="text-sm text-slate-500 uppercase font-bold">Score</div><div className="text-3xl font-black text-blue-400">{stats.score}</div></div>
+                        <div className="bg-slate-800 p-4 rounded-xl"><div className="text-sm text-slate-500 uppercase font-bold">Saved</div><div className="text-3xl font-black text-emerald-400">{stats.discharged}</div></div>
+                        <div className="bg-slate-800 p-4 rounded-xl"><div className="text-sm text-slate-500 uppercase font-bold">Deaths</div><div className="text-3xl font-black text-red-400">{stats.deaths}</div></div>
+                    </div>
+                    <button onClick={onRestart} className="bg-white text-slate-900 px-8 py-4 rounded-xl font-bold text-xl hover:scale-105 transition-transform shadow-xl">Initialise New Simulation</button>
+                </div>
+            </div>
         );
 
         const UserGuide = () => (
@@ -283,6 +412,50 @@
                     </ol>
                 </section>
             </div>
+        );
+
+        const RoleKey = () => {
+            const uniqueRoles = Object.values(ROLE_TEMPLATES);
+            return (
+                <div className="space-y-2">
+                    {uniqueRoles.map(role => {
+                        const RoleIcon = role.icon;
+                        return (
+                            <div key={role.name} className={`flex items-start gap-3 p-3 rounded border ${getColorStyle(role.theme)} bg-white`}>
+                                <div className={`p-2 rounded bg-${role.theme}-100 text-${role.theme}-700 shrink-0`}><RoleIcon size={20} /></div>
+                                <div className="flex-1">
+                                    <div className="flex justify-between items-center mb-1"><h4 className="font-bold text-sm">{role.name}</h4><span className="text-[10px] font-bold uppercase tracking-wider bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">{role.type}</span></div>
+                                    <p className="text-xs text-gray-600 mb-2">{role.desc}</p>
+                                    <div className="grid grid-cols-2 gap-2 text-[10px]"><div className="bg-gray-50 p-1.5 rounded border"><span className="font-bold block text-gray-500">Primary Action</span>{role.actionText}</div><div className="bg-gray-50 p-1.5 rounded border"><span className="font-bold block text-gray-500">Special Ability ({role.abilityCost} AP)</span>{role.ability}: {role.abilityEffect}</div></div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        };
+        
+        const Modal = ({ title, children, onClose }) => (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden modal-enter border border-gray-200 flex flex-col max-h-[90vh]">
+                    <div className="bg-slate-50 px-6 py-4 flex justify-between items-center border-b shrink-0"><h2 className="text-lg font-bold text-slate-800 tracking-wide">{title}</h2><button onClick={onClose} className="text-gray-500 hover:text-gray-800"><X size={20} /></button></div>
+                    <div className="p-6 overflow-y-auto text-slate-700 text-sm flex-1">{children}</div>
+                    <div className="bg-gray-50 px-6 py-4 border-t flex justify-end gap-3 shrink-0"><button onClick={onClose} className="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2 rounded font-bold shadow transition-all">Close</button></div>
+                </div>
+            </div>
+        );
+
+        const Counter = ({ label, value, onChange, min, max }) => (
+            <div className="flex justify-between items-center bg-slate-50 p-3 rounded border border-slate-200"><span className="text-sm font-bold text-slate-700">{label}</span><div className="flex items-center gap-3"><button type="button" onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} className="w-8 h-8 rounded bg-white border flex items-center justify-center hover:bg-slate-100 disabled:opacity-50 text-slate-600 cursor-pointer"><Minus size={16}/></button><span className="w-6 text-center font-bold">{value}</span><button type="button" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} className="w-8 h-8 rounded bg-white border flex items-center justify-center hover:bg-slate-100 disabled:opacity-50 text-slate-600 cursor-pointer"><Plus size={16}/></button></div></div>
+        );
+        
+        const TutorialOverlay = ({ step, children }) => (
+             <div className="fixed inset-0 pointer-events-none z-[60] flex items-center justify-center bg-black/20">
+                 <div className="bg-white p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] max-w-md text-center border-4 border-yellow-400 pointer-events-auto animate-bounce transform -translate-y-12">
+                     <div className="flex items-center justify-center gap-2 mb-2 text-yellow-600 font-black uppercase tracking-wide text-sm"><Lightbulb size={20} /> Tutorial Step {step}/9</div>
+                     <div className="text-slate-900 font-bold text-lg leading-tight">{children}</div>
+                 </div>
+             </div>
         );
 
         // --- MAIN APP ---
