@@ -13,8 +13,6 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- jsPDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
     
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0f172a; user-select: none; overflow: hidden; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
@@ -482,7 +480,7 @@
         };
 
         const EventModal = ({ event, onClose }) => (
-            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4 backdrop-blur-sm animate-fade-in">
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4 modal-enter">
                 <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border-l-8 border-amber-500">
                     <div className="p-6">
                         <div className="flex items-center gap-3 mb-4 text-amber-600"><AlertTriangle size={32} /><h2 className="text-2xl font-black uppercase tracking-tight">Incident Update</h2></div>
@@ -573,7 +571,7 @@
             };
 
             return (
-                <div className="fixed inset-0 bg-slate-900/90 flex items-center justify-center z-[100] p-4 backdrop-blur-sm animate-fade-in">
+                <div className="fixed inset-0 bg-slate-900/90 flex items-center justify-center z-[100] p-4 modal-enter">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm h-[500px] overflow-hidden border border-slate-200 flex flex-col relative">
                         <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
                         <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
@@ -603,7 +601,7 @@
         };
 
         const SitrepModal = ({ zones, patients, onClose }) => (
-            <div className="fixed inset-0 bg-slate-900/90 flex items-center justify-center z-[100] p-4 backdrop-blur-sm animate-fade-in">
+            <div className="fixed inset-0 bg-slate-900/90 flex items-center justify-center z-[100] p-4 modal-enter">
                 <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
                     <div className="bg-slate-800 px-6 py-4 flex justify-between items-center border-b border-slate-700">
                         <div className="flex items-center gap-3">
@@ -729,7 +727,7 @@
         };
         
         const Modal = ({ title, children, onClose }) => (
-            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4 backdrop-blur-sm animate-fade-in">
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4 modal-enter">
                 <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden modal-enter border border-gray-200 flex flex-col max-h-[90vh]">
                     <div className="bg-slate-50 px-6 py-4 flex justify-between items-center border-b shrink-0"><h2 className="text-lg font-bold text-slate-800 tracking-wide">{title}</h2><button onClick={onClose} className="text-gray-500 hover:text-gray-800"><X size={20} /></button></div>
                     <div className="p-6 overflow-y-auto text-slate-700 text-sm flex-1">{children}</div>
@@ -1197,6 +1195,28 @@
                 if(p && currentRole.currentAp > 0 && !currentRole.disabled && p.location !== zoneId) {
                     pushHistory();
                     const zoneName = ZONES.find(z => z.id === zoneId)?.name || zoneId;
+                    
+                    // MANUAL DISCHARGE / MORGUE LOGIC
+                    if (zoneId === 'discharged') {
+                        setDischarged(d => d + 1);
+                        if (p.treated) {
+                            setScore(s => s + 20);
+                            addToast("Patient Discharged Home safely", "success");
+                        } else {
+                            setScore(s => s - 20);
+                            addToast("Unsafe Discharge (-20 Score)", "error");
+                        }
+                    } else if (zoneId === 'morgue') {
+                        // Only count as a "death" statistic if they weren't already dead
+                        // But usually morgue moves are cleanup.
+                        // If you move a living patient to morgue, that's bad.
+                        if (p.category !== 'dead' && !p.history.some(h=>h.msg.includes('DIED'))) {
+                             setDeaths(d => d + 1);
+                             setScore(s => s - 50);
+                             addToast("Patient moved to Morgue prematurely!", "error");
+                        }
+                    }
+
                     setPatients(prev => prev.map(pt => pt.uniqueId === pid ? addHistory({ ...pt, location: zoneId }, `Moved to ${zoneName}`) : pt));
                     deductAp(1); setSelectedPatientId(pid); playAudio('move');
                     if(tutorialStep === 3 && zoneId === 'triage') setTutorialStep(4);
@@ -1261,7 +1281,7 @@
                                 <button type="button" onClick={startGame} className="w-full py-4 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all transform active:scale-95 cursor-pointer">Initialise New Incident</button>
                                 <button type="button" onClick={startTutorial} className="w-full py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl font-bold text-md shadow transition-all cursor-pointer">Play Tutorial</button>
                             </div>
-                            <div className="mt-4 text-xs text-slate-400">Version 7.4 • WMEBEM</div>
+                            <div className="mt-4 text-xs text-slate-400">Version 7.5 • WMEBEM</div>
                         </div>
                     </div>
                 );
