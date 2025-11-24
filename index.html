@@ -26,11 +26,11 @@
         .zone-card.drag-over { background-color: #f0f9ff; border-color: #0284c7; box-shadow: 0 0 0 4px #0284c7 inset; }
         
         /* Patient Colours */
-        .p1-bg { background-color: #fee2e2; border-left: 5px solid #dc2626; } 
-        .p2-bg { background-color: #fef3c7; border-left: 5px solid #d97706; } 
-        .p3-bg { background-color: #d1fae5; border-left: 5px solid #059669; } 
-        .dead-bg { background-color: #e2e8f0; border-left: 5px solid #1e293b; }
-        .neutral-bg { background-color: #f1f5f9; border-left: 5px solid #94a3b8; } 
+        .p1-bg { background-color: #fee2e2; border-left: 6px solid #dc2626; } 
+        .p2-bg { background-color: #fef3c7; border-left: 6px solid #d97706; } 
+        .p3-bg { background-color: #d1fae5; border-left: 6px solid #059669; } 
+        .dead-bg { background-color: #e2e8f0; border-left: 6px solid #1e293b; }
+        .neutral-bg { background-color: #f1f5f9; border-left: 6px solid #94a3b8; } 
         
         /* Tutorial Highlight */
         .tutorial-highlight { 
@@ -193,7 +193,7 @@
             bronze_cmd: { type: 'command', theme: 'slate', icon: Activity, name: 'Bronze Commander', ap: 4, desc: 'Operational Lead', ability: 'Rapid Offload', abilityCost: 'ALL', abilityEffect: 'Move Amb -> Triage', actionText: 'Review', canTriage: true, skills: ['triage', 'care'] },
             senior_doc: { type: 'command', theme: 'slate', icon: ClipboardCheck, name: 'Senior Doctor', ap: 5, desc: 'Clinical Lead', ability: 'Rapid Triage', abilityCost: 2, abilityEffect: 'Reveal All Intake', actionText: 'Review', canTriage: true, canTreat: true, skills: ['advanced_trauma', 'care', 'triage'] },
             nurse_ic: { type: 'nursing', theme: 'blue', icon: Users, name: 'Nurse in Charge', ap: 4, desc: 'Coordination', ability: 'Rapid Offload', abilityCost: 'ALL', abilityEffect: 'Move Amb -> Triage', actionText: 'Coordinate', canTriage: true, skills: ['triage', 'care'] },
-            nurse_staff: { type: 'nursing', theme: 'blue', icon: Syringe, name: 'ED Nurse', ap: 4, desc: 'Care & Triage', ability: 'Mass Stream', abilityCost: 2, abilityEffect: 'Move ALL P3 Amb->Minors', actionText: 'Care / Triage', canTriage: true, canTreat: true, skills: ['care', 'triage'] },
+            nurse_staff: { type: 'nursing', theme: 'blue', icon: Syringe, name: 'ED Nurse', ap: 4, desc: 'Care & Triage', ability: 'Stabilise', abilityCost: 1, abilityEffect: 'Reset Deterioration', actionText: 'Care / Triage', canTriage: true, canTreat: true, skills: ['care', 'triage'] },
             resident: { type: 'medical', theme: 'emerald', icon: Stethoscope, name: 'ED Resident', ap: 4, desc: 'Treatment', ability: 'Fast Track', abilityCost: 2, abilityEffect: 'Instant Treat P3', actionText: 'Procedure', canTreat: true, skills: ['advanced_trauma', 'care', 'triage'] },
             radiology: { type: 'support', theme: 'purple', icon: Scan, name: 'Radiology Lead', ap: 3, desc: 'Diagnostics', ability: 'Rapid Scan', abilityCost: 1, abilityEffect: 'Move to CT Free', actionText: 'Scan', canScan: true, skills: [] },
             bed_manager: { type: 'logistics', theme: 'amber', icon: Bed, name: 'Bed Manager', ap: 3, desc: 'Flow', ability: 'Force Discharge', abilityCost: 1, abilityEffect: 'Clear Ward Bed', actionText: 'Breach', skills: [] }
@@ -371,12 +371,12 @@
             const isDeteriorating = patient.deteriorating;
 
             return (
-                <div draggable onDragStart={(e) => onDragStart(e, patient.uniqueId)} onClick={(e) => { e.stopPropagation(); onSelect(patient.uniqueId); }} className={`p-1.5 rounded-md shadow-sm border cursor-pointer mb-1 transition-all relative group ${getColorClass(patient.category)} ${isSelected ? 'ring-4 ring-blue-500 ring-offset-1 scale-105 z-10' : 'hover:scale-[1.02] border-black/10'} ${isTutorialTarget ? 'tutorial-highlight' : ''}`}>
-                    <div className="flex justify-between items-start mb-0.5"><span className="font-black text-slate-900 text-xs truncate w-24">{patient.name}</span>{isRevealed ? ( <span className="px-1.5 bg-white/90 rounded text-[10px] font-black border border-black/10 shadow-sm">{patient.category}</span> ) : ( <span className="px-1.5 bg-gray-200 rounded text-[10px] font-bold text-gray-500">?</span> )}</div>
-                    {isRevealed ? ( <div className="text-[10px] leading-tight text-slate-700 min-h-[1.5em] line-clamp-2 mb-0.5 font-medium">{patient.text}</div> ) : ( <div className="text-[10px] text-slate-500 italic h-6 flex items-center justify-center bg-black/5 rounded mb-0.5">Awaiting Triage...</div> )}
-                    {isPreAlert && !patient.triaged && <div className="absolute top-8 right-2 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm prealert-flash z-20 border border-white">PRE-ALERT</div>}
-                    {isDeteriorating && <div className="absolute top-10 right-2 text-red-600 animate-bounce"><TrendingUp size={12} /></div>}
-                    <div className="flex gap-1 mt-0.5 border-t border-black/5 pt-0.5 min-h-[16px]">{needs.map((n, i) => { const Icon = n.icon; return ( <div key={i} className={`rounded-full p-0.5 border ${n.bg} ${n.color} ${n.borderColor}`} title={n.label}><Icon size={12} strokeWidth={2.5} /></div> ); })}{patient.treated && <div className="bg-emerald-100 text-emerald-700 rounded-full p-0.5"><Check size={12} strokeWidth={3} /></div>}</div>
+                <div draggable onDragStart={(e) => onDragStart(e, patient.uniqueId)} onClick={(e) => { e.stopPropagation(); onSelect(patient.uniqueId); }} className={`p-2 rounded-md shadow-sm border cursor-pointer mb-2 transition-all relative group ${getColorClass(patient.category)} ${isSelected ? 'ring-4 ring-blue-500 ring-offset-1 scale-105 z-10' : 'hover:scale-[1.02] border-black/10'} ${isTutorialTarget ? 'tutorial-highlight' : ''}`}>
+                    <div className="flex justify-between items-start mb-1"><span className="font-black text-slate-900 text-sm truncate w-32">{patient.name}</span>{isRevealed ? ( <span className="px-1.5 bg-white/90 rounded text-xs font-black border border-black/10 shadow-sm">{patient.category}</span> ) : ( <span className="px-1.5 bg-gray-200 rounded text-xs font-bold text-gray-500">?</span> )}</div>
+                    {isRevealed ? ( <div className="text-xs leading-tight text-slate-700 min-h-[1.5em] line-clamp-2 mb-1 font-medium">{patient.text}</div> ) : ( <div className="text-xs text-slate-500 italic h-6 flex items-center justify-center bg-black/5 rounded mb-1">Awaiting Triage...</div> )}
+                    {isPreAlert && !patient.triaged && <div className="absolute top-8 right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded shadow-sm prealert-flash z-20 border border-white">PRE-ALERT</div>}
+                    {isDeteriorating && <div className="absolute top-10 right-2 text-red-600 animate-bounce"><TrendingUp size={16} /></div>}
+                    <div className="flex gap-1 mt-1 border-t border-black/5 pt-1 min-h-[16px]">{needs.map((n, i) => { const Icon = n.icon; return ( <div key={i} className={`rounded-full p-0.5 border ${n.bg} ${n.color} ${n.borderColor}`} title={n.label}><Icon size={14} strokeWidth={2.5} /></div> ); })}{patient.treated && <div className="bg-emerald-100 text-emerald-700 rounded-full p-0.5"><Check size={14} strokeWidth={3} /></div>}</div>
                 </div>
             );
         };
@@ -397,15 +397,21 @@
 
             return (
                 <div onDragOver={e => !isBlocked && e.preventDefault()} onDrop={e => !isBlocked && onDrop(e, zone.id)} onClick={handleClick}
-                    className={`bg-white border rounded-lg flex flex-col shadow-sm overflow-hidden zone-card ${isDropTarget ? 'ring-2 ring-emerald-400 ring-opacity-50 animate-pulse' : ''} ${selectedPatientId ? 'dimmed cursor-pointer' : ''} ${isBlocked ? 'opacity-50 pointer-events-none bg-slate-100' : ''} ${isTutorialTarget ? 'tutorial-highlight' : ''} h-auto min-h-0 relative`}>
+                    className={`bg-white border rounded-lg flex flex-col shadow-sm overflow-hidden zone-card ${isDropTarget ? 'ring-2 ring-emerald-400 ring-opacity-50 animate-pulse' : ''} ${selectedPatientId ? 'dimmed cursor-pointer' : ''} ${isBlocked ? 'opacity-50 pointer-events-none bg-slate-100' : ''} ${isTutorialTarget ? 'tutorial-highlight' : ''} h-auto relative`}>
                     {isBlocked && <div className="absolute inset-0 flex items-center justify-center bg-slate-200/80 z-10 font-bold text-slate-500 text-xs uppercase tracking-widest">Out of Order</div>}
                     <div className="px-3 py-1.5 border-b flex justify-between items-center bg-white/50">
                         <span className="font-bold text-xs uppercase text-slate-500">{zone.name}</span>
                         <span className={`text-xs font-bold px-1.5 rounded ${zPatients.length > cap ? 'bg-red-100 text-red-600' : 'bg-slate-100'}`}>{zPatients.length}/{cap}</span>
                     </div>
                     <div className="h-1.5 w-full bg-slate-100 relative overflow-hidden"><div className={`h-full transition-all duration-500 ${barColor} progress-bar-striped`} style={{ width: `${percent}%` }}></div></div>
-                    <div className="p-2 min-h-[40px]">
+                    <div className="p-2 flex flex-col gap-1 min-h-[60px]">
                         {zPatients.map(p => ( <PatientCard key={p.uniqueId} patient={p} isSelected={selectedPatientId === p.uniqueId} onSelect={onSelect} onDragStart={(e, id) => e.dataTransfer.setData("patientId", id)} isTutorialTarget={isTutorialTarget && p.uniqueId === 99999} /> ))}
+                        
+                        {zPatients.length < cap && !isBlocked && (
+                            <div className="h-20 border-2 border-dashed border-slate-200 rounded-md flex flex-col items-center justify-center text-slate-300 transition-colors hover:border-blue-300 hover:text-blue-300 bg-slate-50/50">
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Empty Bed</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             );
@@ -1171,35 +1177,39 @@
 
                 if(currentRole.currentAp < currentRole.abilityCost) return;
                 pushHistory();
-                deductAp(currentRole.abilityCost);
-                if(currentRole.id === 'bronze_cmd') { setResources(prev => ({ ...prev, blood: prev.blood + 2, vents: prev.vents + 1 })); addToast("Resources Replenished", "success"); } 
-                else if(currentRole.id.startsWith('senior_doc')) { setPatients(prev => prev.map(p => p.location === 'amb' ? addHistory({...p, triaged: true}, `Rapid Triage by Senior Doc`) : p)); addToast("Rapid Triage Complete", "info"); }
-                else if(currentRole.id === 'nurse_ic') { setPatients(prev => prev.map(p => p.location === 'triage' ? addHistory({...p, triaged: true}, `Team Huddle Triage`) : p)); addToast("Triage Huddle Complete", "info"); }
+                
+                if(currentRole.id === 'bronze_cmd') { deductAp(currentRole.abilityCost); setResources(prev => ({ ...prev, blood: prev.blood + 2, vents: prev.vents + 1 })); addToast("Resources Replenished", "success"); } 
+                else if(currentRole.id.startsWith('senior_doc')) { deductAp(currentRole.abilityCost); setPatients(prev => prev.map(p => p.location === 'amb' ? addHistory({...p, triaged: true}, `Rapid Triage by Senior Doc`) : p)); addToast("Rapid Triage Complete", "info"); }
+                else if(currentRole.id === 'nurse_ic') { deductAp(currentRole.abilityCost); setPatients(prev => prev.map(p => p.location === 'triage' ? addHistory({...p, triaged: true}, `Team Huddle Triage`) : p)); addToast("Triage Huddle Complete", "info"); }
                 else if(currentRole.id.startsWith('nurse_staff')) {
-                    // NEW ABILITY: MASS STREAM
-                    const p3s = patients.filter(p => p.category === 'P3' && p.location === 'amb');
-                    if (p3s.length > 0) {
-                        setPatients(prev => prev.map(p => {
-                             if(p.category === 'P3' && p.location === 'amb') {
-                                 return addHistory({ ...p, location: 'minors', triaged: true }, "Mass Streamed to Minors");
-                             }
-                             return p;
-                        }));
-                        playAudio('move');
-                        addToast(`Streamed ${p3s.length} P3 patients to Minors`, "success");
-                    } else {
-                         addToast("No P3 patients found in Ambulance Bay", "warning");
-                    }
+                    // UPDATED ABILITY: STABILISE
+                    if(!selectedPatientId) { addToast("Select a Patient first!", "error"); return; }
+                    const target = patients.find(p => p.uniqueId === selectedPatientId);
+                    if(!target) return;
+                    
+                    deductAp(currentRole.abilityCost);
+                    setPatients(prev => prev.map(p => {
+                         if(p.uniqueId === selectedPatientId) {
+                             // Reset deteriorating status AND turns waiting counter
+                             return addHistory({ ...p, deteriorating: false, turnsWaiting: 0 }, "Stabilised by Nurse");
+                         }
+                         return p;
+                    }));
+                    playAudio('treat');
+                    addToast(`Patient Stabilised`, "success");
                 }
                 else if(currentRole.id.startsWith('resident')) {
+                    deductAp(currentRole.abilityCost);
                     const p3 = patients.find(p => p.category === 'P3' && !p.treated && p.location === 'minors');
                     if(p3) { setPatients(prev => prev.map(p => p.uniqueId === p3.uniqueId ? addHistory({ ...p, treated: true }, "Fast Track Treatment") : p)); playAudio('treat'); addToast("Fast Track Treatment Complete", "success"); }
                 }
                 else if(currentRole.id === 'radiology') {
+                    deductAp(currentRole.abilityCost);
                     const target = patients.find(p => (p.location === 'resus' || p.location === 'majors') && !p.treated && !p.scanned);
                     if(target) { setPatients(prev => prev.map(p => p.uniqueId === target.uniqueId ? addHistory({ ...p, location: 'ct' }, "Rapid Scan Transfer") : p)); addToast("Patient moved to CT", "info"); }
                 }
                 else if(currentRole.id === 'bed_manager') {
+                    deductAp(currentRole.abilityCost);
                     const target = patients.find(p => p.location === 'ward');
                     if(target) { 
                         setPatients(prev => prev.map(p => p.uniqueId === target.uniqueId ? addHistory({ ...p, location: 'discharged' }, "Forced Discharge") : p)); 
@@ -1425,11 +1435,11 @@
                                 <button type="button" onClick={()=>setSidebarOpen(true)} className="lg:hidden absolute top-3 left-3 z-20 bg-white p-2 rounded shadow cursor-pointer"><Menu size={20}/></button>
                                 {activeEvent && <div className="mb-3 bg-amber-50 border border-amber-200 p-3 rounded flex items-center gap-3 shadow-sm animate-bounce"><AlertTriangle className="text-amber-600"/><div className="text-xs"><span className="font-bold block text-amber-800">{activeEvent.title}</span>{activeEvent.desc} <span className="font-bold">({activeEvent.effect})</span></div></div>}
                                 <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 flex-1 content-start items-start transition-all duration-300 ${selectedPatientId ? 'scale-[0.99]' : ''}`}>
-                                    <div className="col-span-1 bg-red-50/50 rounded-xl border border-red-100/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-red-300 uppercase tracking-widest text-center">Intake</div><div className="flex-1 flex flex-col gap-2"><div className="min-h-0 flex-grow"><ZoneDisplay zone={ZONES[0]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} isTutorialTarget={tutorialStep === 2 && selectedPatientId === null} /></div><div className="min-h-0 flex-grow"><ZoneDisplay zone={ZONES[1]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} isTutorialTarget={tutorialStep === 3} /></div></div></div>
-                                    <div className="col-span-1 bg-blue-50/50 rounded-xl border border-blue-100/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-blue-300 uppercase tracking-widest text-center">Acute</div><div className="flex-1 flex flex-col gap-2"><div className="min-h-0 flex-grow"><ZoneDisplay zone={ZONES[2]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="min-h-0 flex-grow"><ZoneDisplay zone={ZONES[3]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="min-h-0 flex-grow"><ZoneDisplay zone={ZONES[5]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} isTutorialTarget={tutorialStep === 5} /></div></div></div>
-                                    <div className="col-span-1 bg-purple-50/50 rounded-xl border border-purple-100/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-purple-300 uppercase tracking-widest text-center">Imaging</div><div className="flex-1 flex flex-col gap-2"><div className="min-h-0 flex-grow"><ZoneDisplay zone={ZONES[4]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="flex-grow"></div></div></div>
-                                    <div className="col-span-1 bg-emerald-50/50 rounded-xl border border-emerald-100/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-emerald-300 uppercase tracking-widest text-center">Wards</div><div className="flex-1 flex flex-col gap-2"><div className="min-h-0 flex-grow"><ZoneDisplay zone={ZONES[6]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="min-h-0 flex-grow"><ZoneDisplay zone={ZONES[7]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="flex-grow"></div></div></div>
-                                    <div className="col-span-1 bg-gray-100/50 rounded-xl border border-gray-200/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Ops</div><div className="flex-1 flex flex-col gap-2"><div className="min-h-0 flex-grow"><ZoneDisplay zone={ZONES[8]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="min-h-0 flex-grow"><ZoneDisplay zone={ZONES[9]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} isTutorialTarget={tutorialStep === 8} /></div><div className="min-h-0 flex-grow"><ZoneDisplay zone={ZONES[10]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div></div></div>
+                                    <div className="col-span-1 bg-red-50/50 rounded-xl border border-red-100/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-red-300 uppercase tracking-widest text-center">Intake</div><div className="flex-1 flex flex-col gap-2"><div className="w-full"><ZoneDisplay zone={ZONES[0]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} isTutorialTarget={tutorialStep === 2 && selectedPatientId === null} /></div><div className="w-full"><ZoneDisplay zone={ZONES[1]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} isTutorialTarget={tutorialStep === 3} /></div></div></div>
+                                    <div className="col-span-1 bg-blue-50/50 rounded-xl border border-blue-100/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-blue-300 uppercase tracking-widest text-center">Acute</div><div className="flex-1 flex flex-col gap-2"><div className="w-full"><ZoneDisplay zone={ZONES[2]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="w-full"><ZoneDisplay zone={ZONES[3]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="w-full"><ZoneDisplay zone={ZONES[5]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} isTutorialTarget={tutorialStep === 5} /></div></div></div>
+                                    <div className="col-span-1 bg-purple-50/50 rounded-xl border border-purple-100/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-purple-300 uppercase tracking-widest text-center">Imaging</div><div className="flex-1 flex flex-col gap-2"><div className="w-full"><ZoneDisplay zone={ZONES[4]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="flex-grow"></div></div></div>
+                                    <div className="col-span-1 bg-emerald-50/50 rounded-xl border border-emerald-100/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-emerald-300 uppercase tracking-widest text-center">Wards</div><div className="flex-1 flex flex-col gap-2"><div className="w-full"><ZoneDisplay zone={ZONES[6]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="w-full"><ZoneDisplay zone={ZONES[7]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="flex-grow"></div></div></div>
+                                    <div className="col-span-1 bg-gray-100/50 rounded-xl border border-gray-200/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Ops</div><div className="flex-1 flex flex-col gap-2"><div className="w-full"><ZoneDisplay zone={ZONES[8]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="w-full"><ZoneDisplay zone={ZONES[9]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} isTutorialTarget={tutorialStep === 8} /></div><div className="w-full"><ZoneDisplay zone={ZONES[10]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div></div></div>
                                 </div>
 
                                 {/* Footer */}
