@@ -3,27 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WMEBEM Incident Command</title>
-    <!-- Tailwind CSS -->
+    <title>WMEBEM Incident Command - Enhanced</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React and ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- jsPDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0f172a; user-select: none; overflow: hidden; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
         
-        /* Zone Styling */
+        /* Zone Styling - Expert Panel Recommendation */
         .zone-card { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
         .zone-card.dimmed { opacity: 0.4; filter: grayscale(0.8); }
         .zone-card:active { transform: scale(0.98); background-color: #f8fafc; }
         .zone-card.drag-over { background-color: #f0f9ff; border-color: #0284c7; box-shadow: 0 0 0 4px #0284c7 inset; }
+
+        /* Expert Panel: Visual Grouping Tints */
+        .zone-intake { background-color: #fff1f2; border-color: #fecaca; } /* Red tint for Intake */
+        .zone-process { background-color: #fffbeb; border-color: #fde68a; } /* Amber tint for Processing */
+        .zone-clinical { background-color: #f0fdf4; border-color: #bbf7d0; } /* Green tint for Clinical */
+        .zone-diagnostic { background-color: #faf5ff; border-color: #e9d5ff; } /* Purple tint for Diag */
+        .zone-exit { background-color: #f8fafc; border-color: #e2e8f0; } /* Slate tint for Exit */
         
         /* Patient Colours */
         .p1-bg { background-color: #fee2e2; border-left: 6px solid #dc2626; } 
@@ -32,16 +34,34 @@
         .dead-bg { background-color: #e2e8f0; border-left: 6px solid #1e293b; }
         .neutral-bg { background-color: #f1f5f9; border-left: 6px solid #94a3b8; } 
         
-        /* Tutorial Highlight */
-        .tutorial-highlight { 
-            box-shadow: 0 0 0 4px #facc15, 0 0 20px #facc15; 
-            z-index: 50; 
-            position: relative;
-            animation: pulse-ring 2s infinite;
+        /* Expert Panel: Visual Urgency */
+        @keyframes pulse-critical {
+            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); border-color: #dc2626; }
+            70% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); border-color: #ef4444; }
+            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); border-color: #dc2626; }
         }
-        @keyframes pulse-ring {
-            0% { box-shadow: 0 0 0 0px rgba(250, 204, 21, 0.7); }
-            100% { box-shadow: 0 0 0 10px rgba(250, 204, 21, 0); }
+        .pulse-critical { animation: pulse-critical 1.5s infinite; z-index: 20; }
+
+        /* Expert Panel: Ticker */
+        .ticker-wrap {
+            width: 100%;
+            overflow: hidden;
+            background-color: #0f172a;
+            color: #fff;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #334155;
+        }
+        .ticker {
+            display: inline-block;
+            white-space: nowrap;
+            padding-right: 100%;
+            animation: ticker 30s linear infinite;
+        }
+        @keyframes ticker {
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-100%, 0, 0); }
         }
 
         /* Animations */
@@ -54,17 +74,18 @@
         .toast-enter { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
+        /* Vitals Classes */
         .vital-red { color: #dc2626; font-weight: 900; animation: pulse 2s infinite; }
         .vital-amber { color: #d97706; font-weight: bold; }
         .vital-normal { color: #059669; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
 
-        /* Mobile Scrollbar */
+        /* Scrollbars */
         ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: #1e293b; }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+        ::-webkit-scrollbar-track { background: #e2e8f0; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 2px; }
         
-        .logo-h { height: 2rem; width: auto; }
+        .logo-h { height: 1.5rem; width: auto; }
 
         /* Capacity Bar Striping */
         .progress-bar-striped {
@@ -77,14 +98,8 @@
             100% { background-position: 0 0; }
         }
         
-        .prealert-flash {
-            animation: prealert-pulse 1s infinite;
-        }
-        @keyframes prealert-pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
+        .prealert-flash { animation: prealert-pulse 1s infinite; }
+        @keyframes prealert-pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -169,6 +184,8 @@
         const LogOut = (p) => <IconWrapper {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></IconWrapper>;
         const BarChart2 = (p) => <IconWrapper {...p}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></IconWrapper>;
         const TrendingUp = (p) => <IconWrapper {...p}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></IconWrapper>;
+        const Siren = (p) => <IconWrapper {...p}><path d="M7 12a5 5 0 0 1 5-5v0a5 5 0 0 1 5 5v6H7v-6Z"/><path d="M5 20a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2H5v-2Z"/><path d="M21 12h1"/><path d="M18.5 4.5 18 5"/><path d="M2 12h1"/><path d="M12 2v1"/><path d="m4.929 4.929.707.707"/><path d="M12 7a5 5 0 0 0-5 5"/></IconWrapper>;
+        const ArrowRight = (p) => <IconWrapper {...p}><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></IconWrapper>;
 
         // --- CONSTANTS ---
         const LOGO_URL = "https://iili.io/KGQOvkl.md.png";
@@ -190,13 +207,13 @@
             collapse: { name: "Structural Collapse", desc: "Building collapse. Crush injuries and dust inhalation.", p1: 0.25, p2: 0.4, p3: 0.35, type: 'crush' }
         };
         const ROLE_TEMPLATES = {
-            bronze_cmd: { type: 'command', theme: 'slate', icon: Activity, name: 'Bronze Commander', ap: 4, desc: 'Operational Lead', ability: 'Rapid Offload', abilityCost: 'ALL', abilityEffect: 'Move Amb -> Triage', actionText: 'Review', canTriage: true, skills: ['triage', 'care'] },
-            senior_doc: { type: 'command', theme: 'slate', icon: ClipboardCheck, name: 'Senior Doctor', ap: 5, desc: 'Clinical Lead', ability: 'Rapid Triage', abilityCost: 2, abilityEffect: 'Reveal All Intake', actionText: 'Review', canTriage: true, canTreat: true, skills: ['advanced_trauma', 'care', 'triage'] },
-            nurse_ic: { type: 'nursing', theme: 'blue', icon: Users, name: 'Nurse in Charge', ap: 4, desc: 'Coordination', ability: 'Rapid Offload', abilityCost: 'ALL', abilityEffect: 'Move Amb -> Triage', actionText: 'Coordinate', canTriage: true, skills: ['triage', 'care'] },
+            bronze_cmd: { type: 'command', theme: 'slate', icon: Activity, name: 'Bronze Cmd', ap: 4, desc: 'Operational Lead', ability: 'Rapid Offload', abilityCost: 'ALL', abilityEffect: 'Move Amb -> Triage', actionText: 'Review', canTriage: true, skills: ['triage', 'care'] },
+            senior_doc: { type: 'command', theme: 'slate', icon: ClipboardCheck, name: 'Senior Doc', ap: 5, desc: 'Clinical Lead', ability: 'Rapid Triage', abilityCost: 2, abilityEffect: 'Reveal All Intake', actionText: 'Review', canTriage: true, canTreat: true, skills: ['advanced_trauma', 'care', 'triage'] },
+            nurse_ic: { type: 'nursing', theme: 'blue', icon: Users, name: 'Nurse IC', ap: 4, desc: 'Coordination', ability: 'Rapid Offload', abilityCost: 'ALL', abilityEffect: 'Move Amb -> Triage', actionText: 'Coordinate', canTriage: true, skills: ['triage', 'care'] },
             nurse_staff: { type: 'nursing', theme: 'blue', icon: Syringe, name: 'ED Nurse', ap: 4, desc: 'Care & Triage', ability: 'Stabilise', abilityCost: 1, abilityEffect: 'Reset Deterioration', actionText: 'Care / Triage', canTriage: true, canTreat: true, skills: ['care', 'triage'] },
             resident: { type: 'medical', theme: 'emerald', icon: Stethoscope, name: 'ED Resident', ap: 4, desc: 'Treatment', ability: 'Fast Track', abilityCost: 2, abilityEffect: 'Instant Treat P3', actionText: 'Procedure', canTreat: true, skills: ['advanced_trauma', 'care', 'triage'] },
             radiology: { type: 'support', theme: 'purple', icon: Scan, name: 'Radiology Lead', ap: 3, desc: 'Diagnostics', ability: 'Rapid Scan', abilityCost: 1, abilityEffect: 'Move to CT Free', actionText: 'Scan', canScan: true, skills: [] },
-            bed_manager: { type: 'logistics', theme: 'amber', icon: Bed, name: 'Bed Manager', ap: 3, desc: 'Flow', ability: 'Force Discharge', abilityCost: 1, abilityEffect: 'Clear Ward Bed', actionText: 'Breach', skills: [] }
+            bed_manager: { type: 'logistics', theme: 'amber', icon: Bed, name: 'Bed Mgr', ap: 3, desc: 'Flow', ability: 'Force Discharge', abilityCost: 1, abilityEffect: 'Clear Ward Bed', actionText: 'Breach', skills: [] }
         };
         const generateRoster = (counts) => {
             const roles = [];
@@ -204,23 +221,23 @@
             roles.push({ id: 'nurse_ic', ...ROLE_TEMPLATES.nurse_ic });
             roles.push({ id: 'radiology', ...ROLE_TEMPLATES.radiology });
             roles.push({ id: 'bed_manager', ...ROLE_TEMPLATES.bed_manager });
-            for (let i = 0; i < counts.senior; i++) roles.push({ id: `senior_doc_${i}`, ...ROLE_TEMPLATES.senior_doc, name: counts.senior > 1 ? `Senior Doctor ${i+1}` : 'Senior Doctor' });
-            for (let i = 0; i < counts.resident; i++) roles.push({ id: `resident_${i}`, ...ROLE_TEMPLATES.resident, name: counts.resident > 1 ? `ED Resident ${i+1}` : 'ED Resident' });
+            for (let i = 0; i < counts.senior; i++) roles.push({ id: `senior_doc_${i}`, ...ROLE_TEMPLATES.senior_doc, name: counts.senior > 1 ? `Senior Doc ${i+1}` : 'Senior Doc' });
+            for (let i = 0; i < counts.resident; i++) roles.push({ id: `resident_${i}`, ...ROLE_TEMPLATES.resident, name: counts.resident > 1 ? `ED Res ${i+1}` : 'ED Resident' });
             for (let i = 0; i < counts.nurse; i++) roles.push({ id: `nurse_staff_${i}`, ...ROLE_TEMPLATES.nurse_staff, name: counts.nurse > 1 ? `ED Nurse ${i+1}` : 'ED Nurse' });
             return roles;
         };
         const ZONES = [
-            { id: 'amb', name: 'Ambulance Bay', capacity: 12, type: 'intake' },
-            { id: 'triage', name: 'Triage', capacity: 6, type: 'process' },
-            { id: 'resus', name: 'Resus (P1)', capacity: 4, type: 'clinical' },
-            { id: 'majors', name: 'Majors (P2)', capacity: 10, type: 'clinical' },
-            { id: 'ct', name: 'CT Scan', capacity: 1, type: 'diagnostic' },
-            { id: 'minors', name: 'Minors (P3)', capacity: 15, type: 'clinical' },
-            { id: 'icu', name: 'ICU/HDU', capacity: 6, type: 'ward' },
-            { id: 'ward', name: 'Wards', capacity: 30, type: 'ward' },
-            { id: 'theatre', name: 'Theatres', capacity: 2, type: 'treatment' },
-            { id: 'discharged', name: 'Home', capacity: 999, type: 'exit' },
-            { id: 'morgue', name: 'Mortuary', capacity: 999, type: 'exit' }
+            { id: 'amb', name: 'Ambulance Bay', capacity: 12, type: 'intake', style: 'zone-intake' },
+            { id: 'triage', name: 'Triage', capacity: 6, type: 'process', style: 'zone-process' },
+            { id: 'resus', name: 'Resus (P1)', capacity: 4, type: 'clinical', style: 'zone-clinical' },
+            { id: 'majors', name: 'Majors (P2)', capacity: 10, type: 'clinical', style: 'zone-clinical' },
+            { id: 'ct', name: 'CT Scan', capacity: 1, type: 'diagnostic', style: 'zone-diagnostic' },
+            { id: 'minors', name: 'Minors (P3)', capacity: 15, type: 'clinical', style: 'zone-clinical' },
+            { id: 'icu', name: 'ICU/HDU', capacity: 6, type: 'ward', style: 'zone-exit' },
+            { id: 'ward', name: 'Wards', capacity: 30, type: 'ward', style: 'zone-exit' },
+            { id: 'theatre', name: 'Theatres', capacity: 2, type: 'treatment', style: 'zone-clinical' },
+            { id: 'discharged', name: 'Home', capacity: 999, type: 'exit', style: 'zone-exit' },
+            { id: 'morgue', name: 'Mortuary', capacity: 999, type: 'exit', style: 'zone-exit' }
         ];
 
         const getPatientNeeds = (p) => {
@@ -340,6 +357,14 @@
 
         // --- COMPONENTS ---
 
+        const NewsTicker = ({ messages }) => (
+            <div className="ticker-wrap shrink-0 z-30 relative">
+                <div className="ticker text-xs font-mono font-bold flex gap-8 items-center text-red-100">
+                    {messages.length > 0 ? messages.map((m, i) => <span key={i} className="flex items-center gap-2"><Siren size={12} className="text-red-500 animate-pulse"/> {m}</span>) : <span>INCIDENT DECLARED - AWAITING UPDATES...</span>}
+                </div>
+            </div>
+        );
+
         const Toast = ({ msg, type, onClose }) => {
             const styles = { error: "bg-red-600 text-white", info: "bg-blue-600 text-white", success: "bg-emerald-600 text-white", warning: "bg-amber-500 text-white" };
             useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
@@ -369,14 +394,35 @@
             const isRevealed = patient.location !== 'amb' || patient.triaged;
             const isPreAlert = patient.location === 'amb' && patient.category === 'P1';
             const isDeteriorating = patient.deteriorating;
+            const isP1Critical = patient.triaged && patient.category === 'P1' && !patient.treated;
 
             return (
-                <div draggable onDragStart={(e) => onDragStart(e, patient.uniqueId)} onClick={(e) => { e.stopPropagation(); onSelect(patient.uniqueId); }} className={`p-2 rounded-md shadow-sm border cursor-pointer mb-2 transition-all relative group ${getColorClass(patient.category)} ${isSelected ? 'ring-4 ring-blue-500 ring-offset-1 scale-105 z-10' : 'hover:scale-[1.02] border-black/10'} ${isTutorialTarget ? 'tutorial-highlight' : ''}`}>
-                    <div className="flex justify-between items-start mb-1"><span className="font-black text-slate-900 text-sm truncate w-32">{patient.name}</span>{isRevealed ? ( <span className="px-1.5 bg-white/90 rounded text-xs font-black border border-black/10 shadow-sm">{patient.category}</span> ) : ( <span className="px-1.5 bg-gray-200 rounded text-xs font-bold text-gray-500">?</span> )}</div>
-                    {isRevealed ? ( <div className="text-xs leading-tight text-slate-700 min-h-[1.5em] line-clamp-2 mb-1 font-medium">{patient.text}</div> ) : ( <div className="text-xs text-slate-500 italic h-6 flex items-center justify-center bg-black/5 rounded mb-1">Awaiting Triage...</div> )}
-                    {isPreAlert && !patient.triaged && <div className="absolute top-8 right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded shadow-sm prealert-flash z-20 border border-white">PRE-ALERT</div>}
-                    {isDeteriorating && <div className="absolute top-10 right-2 text-red-600 animate-bounce"><TrendingUp size={16} /></div>}
-                    <div className="flex gap-1 mt-1 border-t border-black/5 pt-1 min-h-[16px]">{needs.map((n, i) => { const Icon = n.icon; return ( <div key={i} className={`rounded-full p-0.5 border ${n.bg} ${n.color} ${n.borderColor}`} title={n.label}><Icon size={14} strokeWidth={2.5} /></div> ); })}{patient.treated && <div className="bg-emerald-100 text-emerald-700 rounded-full p-0.5"><Check size={14} strokeWidth={3} /></div>}</div>
+                <div draggable onDragStart={(e) => onDragStart(e, patient.uniqueId)} onClick={(e) => { e.stopPropagation(); onSelect(patient.uniqueId); }} 
+                    className={`p-2 rounded-md shadow-sm border cursor-pointer mb-2 transition-all relative group 
+                    ${getColorClass(patient.category)} 
+                    ${isSelected ? 'ring-4 ring-blue-500 ring-offset-1 scale-105 z-10' : 'hover:scale-[1.02] border-black/10'} 
+                    ${isTutorialTarget ? 'tutorial-highlight' : ''}
+                    ${isP1Critical ? 'pulse-critical' : ''}
+                    `}>
+                    <div className="flex justify-between items-start mb-1"><span className="font-black text-slate-900 text-xs truncate w-24">{patient.name}</span>{isRevealed ? ( <span className={`px-1.5 rounded text-[10px] font-black border border-black/10 shadow-sm ${patient.category === 'P1' ? 'bg-red-600 text-white' : 'bg-white/90'}`}>{patient.category}</span> ) : ( <span className="px-1.5 bg-gray-200 rounded text-[10px] font-bold text-gray-500">?</span> )}</div>
+                    
+                    {isRevealed && (
+                         <div className="flex justify-between items-center mt-1">
+                            <div className="flex gap-1">
+                                {needs.map((n, i) => { const Icon = n.icon; return ( <div key={i} className={`rounded-full p-0.5 border ${n.bg} ${n.color} ${n.borderColor}`} title={n.label}><Icon size={12} strokeWidth={2.5} /></div> ); })}{patient.treated && <div className="bg-emerald-100 text-emerald-700 rounded-full p-0.5"><Check size={12} strokeWidth={3} /></div>}
+                            </div>
+                            {/* Traffic Light Vitals for Expert Panel */}
+                            {patient.triaged && (
+                                <div className="flex gap-1">
+                                    <div className={`w-2 h-2 rounded-full ${patient.vitals.hr > 120 ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} title="HR"></div>
+                                    <div className={`w-2 h-2 rounded-full ${patient.vitals.sbp < 90 ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} title="BP"></div>
+                                </div>
+                            )}
+                         </div>
+                    )}
+                    
+                    {isPreAlert && !patient.triaged && <div className="absolute top-1 right-1 bg-red-600 text-white text-[9px] font-black px-1 rounded shadow-sm prealert-flash z-20 border border-white">PRE-ALERT</div>}
+                    {isDeteriorating && <div className="absolute top-8 right-1 text-red-600 animate-bounce"><TrendingUp size={16} /></div>}
                 </div>
             );
         };
@@ -387,31 +433,21 @@
             let cap = zone.capacity;
             if (activeEvent?.id === 'norovirus' && zone.id === 'ward') cap -= 5;
             const percent = Math.min(100, (zPatients.length / cap) * 100);
-            let barColor = 'bg-emerald-500';
-            if (percent > 50) barColor = 'bg-amber-500';
-            if (percent > 80) barColor = 'bg-red-500';
-            if (isBlocked) barColor = 'bg-slate-400';
-
+            
             const handleClick = () => { if (!isBlocked && selectedPatientId && onZoneClick) onZoneClick(zone.id); };
             const isDropTarget = selectedPatientId && !isBlocked;
 
             return (
                 <div onDragOver={e => !isBlocked && e.preventDefault()} onDrop={e => !isBlocked && onDrop(e, zone.id)} onClick={handleClick}
-                    className={`bg-white border rounded-lg flex flex-col shadow-sm overflow-hidden zone-card ${isDropTarget ? 'ring-2 ring-emerald-400 ring-opacity-50 animate-pulse' : ''} ${selectedPatientId ? 'dimmed cursor-pointer' : ''} ${isBlocked ? 'opacity-50 pointer-events-none bg-slate-100' : ''} ${isTutorialTarget ? 'tutorial-highlight' : ''} h-auto relative`}>
+                    className={`border rounded-lg flex flex-col shadow-sm overflow-hidden zone-card ${zone.style} ${isDropTarget ? 'ring-2 ring-emerald-400 ring-opacity-50 animate-pulse' : ''} ${selectedPatientId ? 'dimmed cursor-pointer' : ''} ${isBlocked ? 'opacity-50 pointer-events-none bg-slate-100' : ''} ${isTutorialTarget ? 'tutorial-highlight' : ''} h-auto relative flex-1 min-h-[120px]`}>
                     {isBlocked && <div className="absolute inset-0 flex items-center justify-center bg-slate-200/80 z-10 font-bold text-slate-500 text-xs uppercase tracking-widest">Out of Order</div>}
-                    <div className="px-3 py-1.5 border-b flex justify-between items-center bg-white/50">
-                        <span className="font-bold text-xs uppercase text-slate-500">{zone.name}</span>
-                        <span className={`text-xs font-bold px-1.5 rounded ${zPatients.length > cap ? 'bg-red-100 text-red-600' : 'bg-slate-100'}`}>{zPatients.length}/{cap}</span>
+                    <div className="px-2 py-1 border-b flex justify-between items-center bg-white/50">
+                        <span className="font-bold text-[10px] uppercase text-slate-500 truncate">{zone.name}</span>
+                        <span className={`text-[10px] font-bold px-1.5 rounded ${zPatients.length > cap ? 'bg-red-100 text-red-600' : 'bg-slate-100'}`}>{zPatients.length}/{cap}</span>
                     </div>
-                    <div className="h-1.5 w-full bg-slate-100 relative overflow-hidden"><div className={`h-full transition-all duration-500 ${barColor} progress-bar-striped`} style={{ width: `${percent}%` }}></div></div>
-                    <div className="p-2 flex flex-col gap-1 min-h-[60px]">
+                    <div className="p-2 flex flex-col gap-1 overflow-y-auto max-h-[250px] custom-scrollbar">
                         {zPatients.map(p => ( <PatientCard key={p.uniqueId} patient={p} isSelected={selectedPatientId === p.uniqueId} onSelect={onSelect} onDragStart={(e, id) => e.dataTransfer.setData("patientId", id)} isTutorialTarget={isTutorialTarget && p.uniqueId === 99999} /> ))}
-                        
-                        {zPatients.length < cap && !isBlocked && (
-                            <div className="h-20 border-2 border-dashed border-slate-200 rounded-md flex flex-col items-center justify-center text-slate-300 transition-colors hover:border-blue-300 hover:text-blue-300 bg-slate-50/50">
-                                <span className="text-[10px] font-bold uppercase tracking-widest">Empty Bed</span>
-                            </div>
-                        )}
+                        {zPatients.length === 0 && <div className="h-full flex items-center justify-center opacity-20 py-4"><zone.type === 'intake' ? <Siren size={24}/> : <Bed size={24}/>}</div>}
                     </div>
                 </div>
             );
@@ -445,7 +481,7 @@
             else if (patient.treated) { mainActionText = "Patient Stable"; mainActionColor = "bg-emerald-800 text-emerald-200"; }
 
             return (
-                <div className="w-full bg-slate-900/95 backdrop-blur-md text-white border-t border-slate-700 shadow-2xl z-50 hud-enter flex flex-col lg:flex-row h-auto lg:h-[280px] shrink-0">
+                <div className="w-full bg-slate-900/95 backdrop-blur-md text-white border-t border-slate-700 shadow-2xl z-50 hud-enter flex flex-col lg:flex-row h-auto lg:h-[240px] shrink-0">
                     <div className="p-4 flex items-center gap-4 border-b lg:border-b-0 lg:border-r border-slate-700 w-full lg:w-1/3 bg-slate-800/50 shrink-0">
                         <StickFigure injuryLoc={patient.injuryLoc} className="h-16 w-16 lg:h-20 lg:w-20 text-slate-300" />
                         <div className="flex-1 min-w-0">
@@ -465,14 +501,12 @@
                                 const StepIcon = step.icon;
                                 return (
                                     <div key={step.id} className={`flex items-center gap-3 ${isActive ? 'opacity-100' : 'opacity-50'}`}>
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 shrink-0 ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : (isActive ? 'bg-blue-600 border-blue-400 text-white animate-pulse' : 'bg-slate-800 border-slate-600 text-slate-500')}`}>
-                                            {isDone ? <Check size={16} strokeWidth={4} /> : <StepIcon size={16} />}
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 shrink-0 ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : (isActive ? 'bg-blue-600 border-blue-400 text-white animate-pulse' : 'bg-slate-800 border-slate-600 text-slate-500')}`}>
+                                            {isDone ? <Check size={12} strokeWidth={4} /> : <StepIcon size={12} />}
                                         </div>
                                         <div className="flex-1">
-                                            <div className={`text-sm font-bold ${isActive ? 'text-white' : 'text-slate-400'}`}>{step.label}</div>
-                                            {isActive && <div className="text-[9px] text-blue-300 font-bold uppercase tracking-wider">Required Now</div>}
+                                            <div className={`text-xs font-bold ${isActive ? 'text-white' : 'text-slate-400'}`}>{step.label}</div>
                                         </div>
-                                        {isNext && <div className="h-8 w-0.5 bg-slate-700 absolute left-[2.4rem] mt-8 -z-10"></div>}
                                     </div>
                                 );
                             })}
@@ -480,7 +514,7 @@
                     </div>
                     <div className="p-4 w-full lg:w-1/3 flex flex-col gap-2 bg-slate-800/30 shrink-0 justify-center">
                         <div className="flex justify-between items-center text-xs text-slate-400 uppercase font-bold mb-1"><span>Role: {role.name}</span><span>AP: {role.currentAp}/{role.ap}</span></div>
-                        <button onClick={onAction} disabled={!isMainActionEnabled || role.currentAp < (activeEvent?.id === 'it_failure' && canTriage ? 2 : 1)} className={`flex-1 py-4 rounded-xl font-bold text-base shadow-lg transition-all flex items-center justify-center gap-2 ${mainActionColor} disabled:opacity-50 disabled:cursor-not-allowed ${highlightAction ? 'tutorial-highlight' : ''}`}>{canTriage && <ClipboardCheck size={20} />}{canScan && <Scan size={20} />}{canTreat && <Stethoscope size={20} />}{mainActionText}{isMainActionEnabled && <span className="bg-black/20 px-1.5 rounded text-xs">{activeEvent?.id === 'it_failure' && canTriage ? '2' : '1'} AP</span>}</button>
+                        <button onClick={onAction} disabled={!isMainActionEnabled || role.currentAp < (activeEvent?.id === 'it_failure' && canTriage ? 2 : 1)} className={`flex-1 py-4 rounded-xl font-bold text-base shadow-lg transition-all flex items-center justify-center gap-2 ${mainActionColor} disabled:opacity-50 disabled:cursor-not-allowed ${highlightAction ? 'tutorial-highlight' : ''}`}>{canTriage && <ClipboardCheck size={20} />}{canScan && <Scan size={20} />}{canTreat && <Stethoscope size={20} />}{mainActionText}</button>
                         <button onClick={onAbility} disabled={role.abilityCost === 'ALL' ? role.currentAp < 1 : role.currentAp < role.abilityCost} className="py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 border border-slate-600"><ShieldAlert size={18} />{role.ability}: {role.abilityEffect}<span className="bg-black/20 px-1.5 rounded text-xs">{role.abilityCost} AP</span></button>
                     </div>
                     <button onClick={onClose} className="absolute top-0 right-0 p-2 text-slate-500 hover:text-white hidden lg:block"><X size={16}/></button>
@@ -784,7 +818,10 @@
             const [isMuted, setIsMuted] = useState(false);
             const [tutorialStep, setTutorialStep] = useState(0); 
             const [toasts, setToasts] = useState([]);
-            const [gameOverType, setGameOverType] = useState(null); // 'win', 'lose', 'abandoned'
+            const [gameOverType, setGameOverType] = useState(null); 
+            const [tickerMsgs, setTickerMsgs] = useState(["MAJOR INCIDENT DECLARED", "EXPECT CASUALTIES"]);
+
+            const addTicker = (msg) => setTickerMsgs(prev => [msg, ...prev].slice(0, 5));
 
             // Audio wrapper using state
             const playAudio = (type) => { if (!isMuted) playSound(type); };
@@ -979,12 +1016,14 @@
             };
 
             const deterioratePatients = (patientList) => {
-                return patientList.map(p => {
+                let deterioratedCount = 0;
+                const newList = patientList.map(p => {
                     // Only deteriorate untreated P1/P2 patients
                     if (p.treated || p.category === 'P3' || ['discharged','morgue'].includes(p.location)) return p;
                     
                     // 30% chance to deteriorate each turn
                     if (Math.random() > 0.7) {
+                        deterioratedCount++;
                         const newVitals = { ...p.vitals };
                         // Deterioration logic: HR goes up, BP goes down
                         newVitals.hr += Math.floor(Math.random() * 15) + 5;
@@ -999,6 +1038,8 @@
                     }
                     return p;
                 });
+                if(deterioratedCount > 0) addTicker(`${deterioratedCount} PATIENTS DETERIORATING - CHECK VITALS!`);
+                return newList;
             };
 
             const startTutorial = () => {
@@ -1041,6 +1082,7 @@
                     else { setPatients(incidentPatients); }
                     setGameState('playing');
                     localStorage.removeItem('wmebem_save');
+                    addTicker("MAJOR INCIDENT DECLARED");
                 } catch(e) { console.error("Start game error", e); }
             };
 
@@ -1059,6 +1101,7 @@
                     const event = RANDOM_EVENTS[Math.floor(Math.random() * RANDOM_EVENTS.length)];
                     setActiveEvent(event);
                     playAudio('alert');
+                    addTicker(`ALERT: ${event.title.toUpperCase()}`);
                     if (event.id === 'needlestick') { setRoleStates(prev => { const nurses = prev.filter(r => r.id.startsWith('nurse_staff')); if (nurses.length > 0) { const target = nurses[Math.floor(Math.random() * nurses.length)]; return prev.map(r => r.id === target.id ? { ...r, disabled: true, currentAp: 0 } : r); } return prev; }); } 
                     else if (event.id === 'med_student') { setRoleStates(prev => prev.map(r => r.id.startsWith('senior_doc') ? { ...r, currentAp: r.currentAp + 2 } : r)); } 
                     else if (event.id === 'rapid_offload') { spawnPatients(3, simTime); }
@@ -1311,7 +1354,7 @@
                                 <button type="button" onClick={startGame} className="w-full py-4 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all transform active:scale-95 cursor-pointer">Initialise New Incident</button>
                                 <button type="button" onClick={startTutorial} className="w-full py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl font-bold text-md shadow transition-all cursor-pointer">Play Tutorial</button>
                             </div>
-                            <div className="mt-4 text-xs text-slate-400">Version 8.0 • WMEBEM</div>
+                            <div className="mt-4 text-xs text-slate-400">Version 9.0 • WMEBEM</div>
                         </div>
                     </div>
                 );
@@ -1338,6 +1381,12 @@
                         )}
                         <div className="h-14 bg-white border-b px-4 flex items-center justify-between shrink-0 z-20 relative shadow-sm">
                             <div className="flex items-center gap-3"><img src={LOGO_URL} className="logo-h" /><span className="font-bold text-base hidden sm:inline">Turn {turn} / {MAX_TURNS} ({formatTime(simTime)})</span></div>
+                            
+                            {/* Expert Panel: Central Ticker */}
+                            <div className="flex-1 mx-4 hidden md:block max-w-xl">
+                                <NewsTicker messages={tickerMsgs} />
+                            </div>
+
                             <div className="flex items-center gap-4 font-bold text-sm">
                                  <div className="flex gap-2 items-center">
                                      <button type="button" onClick={() => setModalContent('sitrep')} className="hidden lg:flex text-xs font-bold text-blue-600 hover:text-blue-800 items-center gap-1 px-3 py-1 rounded hover:bg-blue-50 transition-colors cursor-pointer"><BarChart2 size={16} /> SitRep</button>
@@ -1348,17 +1397,26 @@
                                  </div>
                                 <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
                                 <button type="button" onClick={handleEndShift} className={`flex items-center gap-1 px-3 py-1 rounded text-xs font-bold cursor-pointer transition-colors bg-slate-100 hover:bg-slate-200 text-slate-600`}><LogOut size={14} /> <span className="hidden sm:inline">End Shift</span></button>
-                                <div className="flex flex-col items-center leading-none mx-2"><span className="text-[10px] text-slate-400 uppercase">Score</span><span className="font-bold">{score}</span></div>
-                                <button type="button" onClick={nextTurn} disabled={tutorialStep > 0} className="bg-slate-800 text-white px-4 py-1.5 rounded text-xs hover:bg-slate-700 font-bold cursor-pointer disabled:opacity-50">Next</button>
+                                <div className="flex flex-col items-center leading-none mx-2"><span className="text-[10px] text-slate-400 uppercase">Score</span><span className="font-bold text-lg text-emerald-600">{score}</span></div>
+                                <button type="button" onClick={nextTurn} disabled={tutorialStep > 0} className="bg-slate-800 text-white px-4 py-1.5 rounded text-xs hover:bg-slate-700 font-bold cursor-pointer disabled:opacity-50 animate-pulse">Next</button>
                             </div>
                         </div>
                         <div className="flex flex-1 overflow-hidden relative">
                             <div className={`absolute inset-y-0 left-0 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 transition duration-200 ease-in-out w-64 bg-white border-r flex flex-col shrink-0 z-30 shadow-2xl lg:shadow-none`}>
-                                <div className="p-4 border-b bg-slate-50 flex justify-between items-center"><span className="font-black text-[10px] uppercase tracking-widest text-slate-400">Resources</span><button type="button" onClick={()=>setSidebarOpen(false)} className="lg:hidden text-slate-400 cursor-pointer"><X size={16}/></button></div>
+                                {/* Expert Panel: Resources moved to Sidebar for ergonomics */}
                                 <div className="p-4 border-b bg-slate-50 grid grid-cols-2 gap-2 text-center text-xs font-bold">
-                                    <div className="bg-white border rounded p-1 shadow-sm"><Droplet size={14} className="mx-auto text-red-500 mb-1"/>{resources.blood}</div>
-                                    <div className="bg-white border rounded p-1 shadow-sm"><Wind size={14} className="mx-auto text-emerald-500 mb-1"/>{resources.vents}</div>
+                                    <div className="bg-white border rounded p-2 shadow-sm">
+                                        <Droplet size={16} className="mx-auto text-red-500 mb-1"/>
+                                        <div className="text-lg font-black">{resources.blood}</div>
+                                        <div className="text-[10px] text-slate-400 uppercase">Blood</div>
+                                    </div>
+                                    <div className="bg-white border rounded p-2 shadow-sm">
+                                        <Wind size={16} className="mx-auto text-blue-500 mb-1"/>
+                                        <div className="text-lg font-black">{resources.vents}</div>
+                                        <div className="text-[10px] text-slate-400 uppercase">Vents</div>
+                                    </div>
                                 </div>
+                                
                                 <div className="p-3 border-b font-bold text-xs text-slate-400 uppercase tracking-widest flex justify-between items-center">
                                     <span>Staff Rostering</span>
                                     <div className="lg:hidden flex gap-2"><button type="button" onClick={() => setModalContent('guide')} className="text-blue-600 cursor-pointer"><BookOpen size={14}/></button><button type="button" onClick={() => setModalContent('roles')} className="text-purple-600 cursor-pointer"><BadgeInfo size={14}/></button></div>
@@ -1395,10 +1453,8 @@
                                                     <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${r.currentAp === 0 ? 'bg-red-500 text-white' : 'bg-white/30'}`}>{r.currentAp}</span>
                                                 </div>
                                                 
-                                                {/* EXPANDED DETAILS */}
                                                 {isSelected && !r.disabled && (
                                                     <div className="mt-3 pt-2 border-t border-white/20 text-[10px] space-y-2 animate-fadeIn">
-                                                        {/* Skills List */}
                                                         <div>
                                                             <span className="uppercase tracking-wider opacity-60 font-bold block mb-1">Capabilities</span>
                                                             <div className="flex flex-wrap gap-1">
@@ -1407,15 +1463,11 @@
                                                                 {r.id === 'bed_manager' && <span className="px-1.5 py-0.5 bg-white/20 rounded text-[10px]">Bed Flow</span>}
                                                             </div>
                                                         </div>
-                                                        
-                                                        {/* Special Ability */}
                                                         <div>
                                                             <span className="uppercase tracking-wider opacity-60 font-bold block mb-1">Ability: {r.ability}</span>
                                                             <div className="bg-black/20 p-1.5 rounded italic leading-tight mb-2">
                                                                 {r.abilityEffect} ({r.abilityCost === 'ALL' ? 'All AP' : `${r.abilityCost} AP`})
                                                             </div>
-                                                            
-                                                            {/* NEW QUICK ACTION BUTTON */}
                                                              <button 
                                                                 onClick={(e) => { e.stopPropagation(); handleAbility(); }}
                                                                 disabled={r.currentAp < (r.abilityCost === 'ALL' ? 1 : r.abilityCost)}
@@ -1431,31 +1483,60 @@
                                     })}
                                 </div>
                             </div>
-                            <div className="flex-1 bg-slate-200 p-3 overflow-y-auto relative flex flex-col" onClick={() => setSelectedPatientId(null)}>
+                            
+                            {/* EXPERT PANEL: PIPELINE LAYOUT */}
+                            <div className="flex-1 bg-slate-200 p-3 overflow-x-auto relative flex flex-col" onClick={() => setSelectedPatientId(null)}>
                                 <button type="button" onClick={()=>setSidebarOpen(true)} className="lg:hidden absolute top-3 left-3 z-20 bg-white p-2 rounded shadow cursor-pointer"><Menu size={20}/></button>
                                 {activeEvent && <div className="mb-3 bg-amber-50 border border-amber-200 p-3 rounded flex items-center gap-3 shadow-sm animate-bounce"><AlertTriangle className="text-amber-600"/><div className="text-xs"><span className="font-bold block text-amber-800">{activeEvent.title}</span>{activeEvent.desc} <span className="font-bold">({activeEvent.effect})</span></div></div>}
-                                <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 flex-1 content-start items-start transition-all duration-300 ${selectedPatientId ? 'scale-[0.99]' : ''}`}>
-                                    <div className="col-span-1 bg-red-50/50 rounded-xl border border-red-100/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-red-300 uppercase tracking-widest text-center">Intake</div><div className="flex-1 flex flex-col gap-2"><div className="w-full"><ZoneDisplay zone={ZONES[0]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} isTutorialTarget={tutorialStep === 2 && selectedPatientId === null} /></div><div className="w-full"><ZoneDisplay zone={ZONES[1]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} isTutorialTarget={tutorialStep === 3} /></div></div></div>
-                                    <div className="col-span-1 bg-blue-50/50 rounded-xl border border-blue-100/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-blue-300 uppercase tracking-widest text-center">Acute</div><div className="flex-1 flex flex-col gap-2"><div className="w-full"><ZoneDisplay zone={ZONES[2]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="w-full"><ZoneDisplay zone={ZONES[3]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="w-full"><ZoneDisplay zone={ZONES[5]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} isTutorialTarget={tutorialStep === 5} /></div></div></div>
-                                    <div className="col-span-1 bg-purple-50/50 rounded-xl border border-purple-100/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-purple-300 uppercase tracking-widest text-center">Imaging</div><div className="flex-1 flex flex-col gap-2"><div className="w-full"><ZoneDisplay zone={ZONES[4]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="flex-grow"></div></div></div>
-                                    <div className="col-span-1 bg-emerald-50/50 rounded-xl border border-emerald-100/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-emerald-300 uppercase tracking-widest text-center">Wards</div><div className="flex-1 flex flex-col gap-2"><div className="w-full"><ZoneDisplay zone={ZONES[6]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="w-full"><ZoneDisplay zone={ZONES[7]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="flex-grow"></div></div></div>
-                                    <div className="col-span-1 bg-gray-100/50 rounded-xl border border-gray-200/50 p-2 flex flex-col gap-2"><div className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Ops</div><div className="flex-1 flex flex-col gap-2"><div className="w-full"><ZoneDisplay zone={ZONES[8]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div><div className="w-full"><ZoneDisplay zone={ZONES[9]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} isTutorialTarget={tutorialStep === 8} /></div><div className="w-full"><ZoneDisplay zone={ZONES[10]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} /></div></div></div>
-                                </div>
+                                
+                                <div className="flex gap-4 h-full min-w-[1024px] pb-24 lg:pb-0">
+                                    {/* COLUMN 1: INTAKE */}
+                                    <div className="w-64 flex flex-col gap-2 shrink-0">
+                                        <div className="text-[10px] font-black text-red-400 uppercase tracking-widest text-center flex items-center justify-center gap-2"><Siren size={12}/> Intake</div>
+                                        <ZoneDisplay zone={ZONES[0]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} isTutorialTarget={tutorialStep === 2 && selectedPatientId === null} />
+                                        <ZoneDisplay zone={ZONES[1]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} isTutorialTarget={tutorialStep === 3} />
+                                    </div>
 
-                                {/* Footer */}
-                                <div className="mt-4 border-t border-gray-300 pt-2 pb-24 lg:pb-2 text-[10px] text-gray-500 flex flex-wrap justify-between items-center gap-2">
-                                    <div className="flex gap-4"><span>© 2025 WMEBEM. Licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">CC BY-NC-SA 4.0</a>.</span></div>
-                                    <div className="flex gap-4">
-                                        <a href="https://www.england.nhs.uk/ourwork/eprr/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">NHS England EPRR</a>
-                                        <span>•</span>
-                                        <a href="https://www.england.nhs.uk/publication/clinical-guidelines-for-major-incidents-and-mass-casualty-events/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">Clinical Guidelines</a>
-                                        <span>•</span>
-                                        <a href="https://tstmitt.netlify.app" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline font-bold">TST / MITT Training</a>
+                                    <div className="flex items-center justify-center"><ArrowRight className="text-slate-300" size={24}/></div>
+
+                                    {/* COLUMN 2: CLINICAL */}
+                                    <div className="w-64 flex flex-col gap-2 shrink-0">
+                                        <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest text-center flex items-center justify-center gap-2"><Stethoscope size={12}/> Clinical</div>
+                                        <ZoneDisplay zone={ZONES[2]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} />
+                                        <ZoneDisplay zone={ZONES[3]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} />
+                                        <ZoneDisplay zone={ZONES[5]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} isTutorialTarget={tutorialStep === 5} />
+                                    </div>
+
+                                    <div className="flex items-center justify-center"><ArrowRight className="text-slate-300" size={24}/></div>
+
+                                    {/* COLUMN 3: DIAGNOSTICS & THEATRE */}
+                                    <div className="w-56 flex flex-col gap-2 shrink-0">
+                                        <div className="text-[10px] font-black text-purple-400 uppercase tracking-widest text-center flex items-center justify-center gap-2"><Scan size={12}/> Inv / Tx</div>
+                                        <ZoneDisplay zone={ZONES[4]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} />
+                                        <ZoneDisplay zone={ZONES[8]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} />
+                                    </div>
+
+                                    <div className="flex items-center justify-center"><ArrowRight className="text-slate-300" size={24}/></div>
+
+                                    {/* COLUMN 4: DISPOSITION */}
+                                    <div className="w-64 flex flex-col gap-2 shrink-0">
+                                        <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest text-center flex items-center justify-center gap-2"><DoorOpen size={12}/> Disposition</div>
+                                        <div className="flex-1 flex flex-col gap-2">
+                                            <ZoneDisplay zone={ZONES[7]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} />
+                                            <ZoneDisplay zone={ZONES[6]} patients={patients} onSelect={setSelectedPatientId} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={activeEvent} />
+                                            <div className="h-32 rounded-xl border-2 border-dashed border-slate-300 bg-slate-100 flex flex-col items-center justify-center text-slate-400 hover:bg-slate-50 transition-colors" 
+                                                onDragOver={e => e.preventDefault()} 
+                                                onDrop={e => handleDrop(e, 'discharged')}
+                                                onClick={() => handleZoneClick('discharged')}>
+                                                <LogOut size={24} className="mb-2"/>
+                                                <span className="font-bold uppercase tracking-widest text-xs">Drag to Discharge</span>
+                                                <span className="text-[10px] mt-1 text-slate-400">Home / Morgue</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             
-                            {/* HUD docked at the bottom of the flex container, not fixed */}
                             {selectedPatient && currentRole && (
                                 <div className="shrink-0 border-t border-slate-700 shadow-2xl z-40">
                                     <ActionHUD patient={selectedPatient} role={currentRole} onClose={() => setSelectedPatientId(null)} onAction={handleAction} onAbility={handleAbility} resources={resources} time={formatTime(simTime)} activeEvent={activeEvent} tutorialStep={tutorialStep} isActiveTriage={isActiveTriageMode} />
