@@ -65,18 +65,59 @@ body { font-family: 'Inter', sans-serif; background-color: #0f172a; user-select:
 
 .logo-h { height: 1.5rem; width: auto; }
 
-.progress-bar-striped {
-    background-image: linear-gradient(45deg,rgba(255,255,255,.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.15) 50%,rgba(255,255,255,.15) 75%,transparent 75%,transparent);
-    background-size: 1rem 1rem;
-    animation: progress-bar-stripes 1s linear infinite;
-}
-@keyframes progress-bar-stripes {
-    0% { background-position: 1rem 0; }
-    100% { background-position: 0 0; }
-}
-
 .prealert-flash { animation: prealert-pulse 1s infinite; }
 @keyframes prealert-pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-.tutorial-highlight { box-shadow: 0 0 0 4px #facc15 inset; animation: pulse-highlight 2s infinite; }
-@keyframes pulse-highlight { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+.fatigue-bg { background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.03) 10px, rgba(0,0,0,0.03) 20px); }
+
+/* Enhanced Tutorial Animations */
+.tutorial-highlight { 
+    box-shadow: 0 0 0 4px #facc15 inset !important; 
+    animation: pulse-highlight 1.5s infinite; 
+    position: relative;
+    z-index: 60;
+}
+@keyframes pulse-highlight { 
+    0% { box-shadow: 0 0 0 4px rgba(250, 204, 21, 1) inset; } 
+    50% { box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.4) inset; } 
+    100% { box-shadow: 0 0 0 4px rgba(250, 204, 21, 1) inset; } 
+}
+
+.tutorial-pointer-up::after {
+    content: "👆";
+    position: absolute;
+    bottom: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 32px;
+    animation: bounce-up 1s infinite;
+    z-index: 100;
+    text-shadow: 0px 2px 4px rgba(0,0,0,0.5);
+}
+@keyframes bounce-up { 0%, 100% { bottom: -40px; } 50% { bottom: -25px; } }
+
+.tutorial-pointer-down::after {
+    content: "👇";
+    position: absolute;
+    top: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 32px;
+    animation: bounce-down 1s infinite;
+    z-index: 100;
+    text-shadow: 0px 2px 4px rgba(0,0,0,0.5);
+}
+@keyframes bounce-down { 0%, 100% { top: -40px; } 50% { top: -25px; } }
+
+.tutorial-pointer-right::after {
+    content: "👉";
+    position: absolute;
+    top: 50%;
+    left: -40px;
+    transform: translateY(-50%);
+    font-size: 32px;
+    animation: bounce-right 1s infinite;
+    z-index: 100;
+    text-shadow: 0px 2px 4px rgba(0,0,0,0.5);
+}
+@keyframes bounce-right { 0%, 100% { left: -40px; } 50% { left: -25px; } }
