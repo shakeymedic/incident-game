@@ -1,4 +1,4 @@
-const { useState, useEffect, useReducer } = React;
+const { useState, useEffect, useReducer, useMemo } = React;
 
 let audioCtx = null;
 const getAudioCtx = () => {
@@ -87,9 +87,8 @@ const RANDOM_EVENTS = [
     { id: 'needlestick', title: 'Needlestick Injury', desc: 'A Nurse has sustained a needlestick injury and must report to Occ Health.', effect: 'One Nurse removed for 1 turn.' },
     { id: 'ct_overheat', title: 'Scanner Overheat', desc: 'The CT Scanner cooling system has failed.', effect: 'CT Scanner disabled for this turn.' },
     { id: 'norovirus', title: 'Norovirus Outbreak', desc: 'Ward 4 closed due to D&V.', effect: 'Ward Capacity reduced by 5.' },
-    { id: 'med_student', title: 'Keen Med Student', desc: 'A final year student offers to help with bloods.', effect: 'Senior Doctor gains +2 AP.' },
+    { id: 'med_student', title: 'Keen Med Student', desc: 'A final year student offers to help with bloods.', effect: 'Senior Doctor action reset.' },
     { id: 'rapid_offload', title: 'Rapid Offload', desc: 'Multiple ambulances arrive at once.', effect: '3 Extra Patients added to Ambulance Bay.' },
-    { id: 'it_failure', title: 'IT Systems Failure', desc: 'EPR is down. We are on paper.', effect: 'Triage costs 2 AP this turn.' },
     { id: 'exit_block_icu', title: 'ICU Bed Crisis', desc: 'Intensive Care has declared critical capacity.', effect: 'ICU admissions blocked for this turn.' },
     { id: 'exit_block_ward', title: 'Ward Flow Block', desc: 'No porters available to move patients.', effect: 'Ward admissions blocked for this turn.' }
 ];
@@ -122,13 +121,13 @@ const SCENARIOS = {
 };
 
 const ROLE_TEMPLATES = {
-    bronze_cmd: { type: 'command', theme: 'slate', icon: Activity, name: 'Bronze Cmd', ap: 4, desc: 'Operational Lead', ability: 'Rapid Offload', abilityCost: 'ALL', abilityEffect: 'Move Amb -> Triage', actionText: 'Review', canTriage: true, skills: ['triage', 'care'] },
-    senior_doc: { type: 'command', theme: 'slate', icon: ClipboardCheck, name: 'Senior Doc', ap: 5, desc: 'Clinical Lead', ability: 'Rapid Triage', abilityCost: 2, abilityEffect: 'Reveal All Intake', actionText: 'Review', canTriage: true, canTreat: true, skills: ['advanced_trauma', 'care', 'triage'] },
-    nurse_ic: { type: 'nursing', theme: 'blue', icon: Users, name: 'Nurse IC', ap: 4, desc: 'Coordination', ability: 'Rapid Offload', abilityCost: 'ALL', abilityEffect: 'Move Amb -> Triage', actionText: 'Coordinate', canTriage: true, skills: ['triage', 'care'] },
-    nurse_staff: { type: 'nursing', theme: 'blue', icon: Syringe, name: 'ED Nurse', ap: 3, desc: 'Care & Triage', ability: 'Stabilise', abilityCost: 1, abilityEffect: 'Reset Deterioration', actionText: 'Care / Triage', canTriage: true, canTreat: true, skills: ['care', 'triage'] },
-    resident: { type: 'medical', theme: 'emerald', icon: Stethoscope, name: 'ED Resident', ap: 4, desc: 'Treatment', ability: 'Fast Track', abilityCost: 2, abilityEffect: 'Instant Treat P3', actionText: 'Procedure', canTreat: true, skills: ['advanced_trauma', 'care', 'triage'] },
-    radiology: { type: 'support', theme: 'purple', icon: Scan, name: 'Radiology Lead', ap: 3, desc: 'Diagnostics', ability: 'Rapid Scan', abilityCost: 1, abilityEffect: 'Move to CT Free', actionText: 'Scan', canScan: true, skills: [] },
-    bed_manager: { type: 'logistics', theme: 'amber', icon: Bed, name: 'Bed Mgr', ap: 3, desc: 'Flow', ability: 'Clear Block', abilityCost: 2, abilityEffect: 'Force open Wards/ICU', actionText: 'Manage Flow', skills: [] }
+    bronze_cmd: { type: 'command', theme: 'slate', icon: Activity, name: 'Bronze Cmd', ap: 4, desc: 'Operational Lead', ability: 'Rapid Offload', abilityCost: 'ALL', maxCooldown: 2, abilityEffect: 'Move Amb -> Triage', actionText: 'Review', canTriage: true, skills: ['triage', 'care'] },
+    senior_doc: { type: 'command', theme: 'slate', icon: ClipboardCheck, name: 'Senior Doc', ap: 5, desc: 'Clinical Lead', ability: 'Rapid Triage', abilityCost: 2, maxCooldown: 2, abilityEffect: 'Reveal All Intake', actionText: 'Review', canTriage: true, canTreat: true, skills: ['advanced_trauma', 'care', 'triage'] },
+    nurse_ic: { type: 'nursing', theme: 'blue', icon: Users, name: 'Nurse IC', ap: 4, desc: 'Coordination', ability: 'Rapid Offload', abilityCost: 'ALL', maxCooldown: 2, abilityEffect: 'Move Amb -> Triage', actionText: 'Coordinate', canTriage: true, skills: ['triage', 'care'] },
+    nurse_staff: { type: 'nursing', theme: 'blue', icon: Syringe, name: 'ED Nurse', ap: 3, desc: 'Care & Triage', ability: 'Stabilise', abilityCost: 1, maxCooldown: 2, abilityEffect: 'Reset Deterioration', actionText: 'Care / Triage', canTriage: true, canTreat: true, skills: ['care', 'triage'] },
+    resident: { type: 'medical', theme: 'emerald', icon: Stethoscope, name: 'ED Resident', ap: 4, desc: 'Treatment', ability: 'Fast Track', abilityCost: 2, maxCooldown: 2, abilityEffect: 'Instant Treat P3', actionText: 'Procedure', canTreat: true, skills: ['advanced_trauma', 'care', 'triage'] },
+    radiology: { type: 'support', theme: 'purple', icon: Scan, name: 'Radiology Lead', ap: 3, desc: 'Diagnostics', ability: 'Rapid Scan', abilityCost: 1, maxCooldown: 1, abilityEffect: 'Scan waiting patient', actionText: 'Scan', canScan: true, skills: [] },
+    bed_manager: { type: 'logistics', theme: 'amber', icon: Bed, name: 'Bed Mgr', ap: 3, desc: 'Flow', ability: 'Clear Block', abilityCost: 2, maxCooldown: 3, abilityEffect: 'Force open Wards/ICU', actionText: 'Manage Flow', skills: [] }
 };
 
 const generateRoster = (counts, bonus = null) => {
@@ -144,7 +143,7 @@ const generateRoster = (counts, bonus = null) => {
     for (let i = 0; i < counts.resident; i++) roles.push({ id: `resident_${i}`, ...ROLE_TEMPLATES.resident, name: counts.resident > 1 ? `ED Res ${i+1}` : 'ED Resident' });
     for (let i = 0; i < nurseCount; i++) roles.push({ id: `nurse_staff_${i}`, ...ROLE_TEMPLATES.nurse_staff, name: nurseCount > 1 ? `ED Nurse ${i+1}` : 'ED Nurse' });
     
-    return roles.map(r => ({ ...r, currentAp: r.ap, disabled: false, consecutiveZeroAp: 0, fatigued: false }));
+    return roles.map(r => ({ ...r, currentAp: r.ap, cooldown: 0, disabled: false }));
 };
 
 const ZONES = [
@@ -187,39 +186,17 @@ const PATIENT_TEMPLATES = {
 const getPatientNeeds = (p) => {
     const needs = [];
     if (!p.triaged) {
-        needs.push({ id: 'triage', label: 'Primary Triage', icon: ClipboardCheck, color: 'text-slate-600', bg: 'bg-slate-100', borderColor: 'border-slate-300' });
-    } else if (!p.secondaryTriaged && (p.location === 'resus' || p.location === 'majors')) {
-        needs.push({ id: 'secondary_triage', label: 'Secondary Triage', icon: Activity, color: 'text-blue-600', bg: 'bg-blue-100', borderColor: 'border-blue-300' });
+        needs.push({ id: 'triage', label: 'Triage', icon: ClipboardCheck, color: 'text-slate-600', bg: 'bg-slate-100', borderColor: 'border-slate-300' });
     }
     if (p.triaged && !p.treated) {
         const needsScan = (p.injuryLoc === 'head' || p.injuryLoc === 'abdo') && !p.scanned;
         if (needsScan) needs.push({ id: 'scan', label: 'CT Scan', icon: Scan, color: 'text-purple-600', bg: 'bg-purple-100', borderColor: 'border-purple-300' });
-        if (!needsScan && p.secondaryTriaged) {
+        if (!needsScan) {
             const label = p.reqSkill === 'advanced_trauma' ? 'Needs Doctor' : 'Treatment';
             needs.push({ id: 'treat', label: label, icon: Stethoscope, color: 'text-emerald-600', bg: 'bg-emerald-100', borderColor: 'border-emerald-300', reqSkill: p.reqSkill });
         }
     }
-    if (p.treated && !['discharged','ward','icu','morgue'].includes(p.location)) {
-        needs.push({ id: 'move', label: 'Admit/Discharge', icon: DoorOpen, color: 'text-amber-600', bg: 'bg-amber-100', borderColor: 'border-amber-300' });
-    }
     return needs;
-};
-
-const getCarePathway = (p) => {
-    const steps = [];
-    steps.push({ id: 'triage', label: 'Primary Triage', status: p.triaged ? 'done' : 'current', icon: ClipboardCheck });
-    if (p.category !== 'P3') {
-        steps.push({ id: 'secondary_triage', label: 'TRTS Score', status: p.secondaryTriaged ? 'done' : (p.triaged ? 'current' : 'pending'), icon: Activity });
-    }
-    const needsScan = (p.injuryLoc === 'head' || p.injuryLoc === 'abdo');
-    if (needsScan) { steps.push({ id: 'scan', label: 'CT Scan', status: p.scanned ? 'done' : (p.secondaryTriaged ? 'current' : 'pending'), icon: Scan }); }
-    
-    const readyToTreat = (p.category === 'P3' && p.triaged) || (p.secondaryTriaged && (!needsScan || p.scanned));
-    steps.push({ id: 'treat', label: p.reqSkill === 'advanced_trauma' ? 'Resus/Surgical' : 'Medical Care', status: p.treated ? 'done' : (readyToTreat ? 'current' : 'pending'), icon: Stethoscope });
-    
-    const isDischarged = ['discharged','ward','icu','morgue'].includes(p.location);
-    steps.push({ id: 'move', label: 'Disposition', status: isDischarged ? 'done' : (p.treated ? 'current' : 'pending'), icon: DoorOpen });
-    return steps;
 };
 
 const getColorStyle = (theme) => ({
@@ -392,14 +369,37 @@ const Counter = ({ label, value, onChange, min, max }) => (
 const TutorialOverlay = ({ step, children }) => (
     <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[100] pointer-events-none w-full max-w-lg px-4">
         <div className="bg-slate-900 border-4 border-blue-500 p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] text-center animate-bounce">
-            <div className="flex items-center justify-center gap-2 mb-2 text-blue-400 font-black uppercase tracking-wide text-sm"><Lightbulb size={20} /> Training Protocol: Step {step}/9</div>
+            <div className="flex items-center justify-center gap-2 mb-2 text-blue-400 font-black uppercase tracking-wide text-sm"><Lightbulb size={20} /> Training Protocol: Step {step}/7</div>
             <div className="text-white font-bold text-lg leading-tight">{children}</div>
         </div>
     </div>
 );
 
+const PathwayProgress = ({ patient }) => {
+    const isDischarged = ['discharged','ward','icu','morgue'].includes(patient.location);
+    const needsScan = (patient.injuryLoc === 'head' || patient.injuryLoc === 'abdo');
+    
+    return (
+        <div className="flex items-center justify-center gap-1 mt-2 border-t border-black/10 pt-1">
+            <div className={`w-4 h-4 rounded-full flex items-center justify-center ${patient.triaged ? 'bg-emerald-500 text-white' : 'bg-blue-500 text-white animate-pulse'}`}><ClipboardCheck size={10} /></div>
+            <div className={`h-0.5 w-3 ${patient.triaged ? 'bg-emerald-500' : 'bg-gray-200'}`}></div>
+            
+            {needsScan && (
+                <>
+                    <div className={`w-4 h-4 rounded-full flex items-center justify-center ${patient.scanned ? 'bg-emerald-500 text-white' : (patient.triaged ? 'bg-purple-500 text-white animate-pulse' : 'bg-gray-200 text-gray-400')}`}><Scan size={10} /></div>
+                    <div className={`h-0.5 w-3 ${patient.scanned ? 'bg-emerald-500' : 'bg-gray-200'}`}></div>
+                </>
+            )}
+            
+            <div className={`w-4 h-4 rounded-full flex items-center justify-center ${patient.treated ? 'bg-emerald-500 text-white' : ((patient.triaged && (!needsScan || patient.scanned)) ? 'bg-blue-500 text-white animate-pulse' : 'bg-gray-200 text-gray-400')}`}><Stethoscope size={10} /></div>
+            <div className={`h-0.5 w-3 ${patient.treated ? 'bg-emerald-500' : 'bg-gray-200'}`}></div>
+            
+            <div className={`w-4 h-4 rounded-full flex items-center justify-center ${isDischarged ? 'bg-emerald-500 text-white' : (patient.treated ? 'bg-amber-500 text-white animate-pulse' : 'bg-gray-200 text-gray-400')}`}><DoorOpen size={10} /></div>
+        </div>
+    );
+};
+
 const PatientCard = ({ patient, onSelect, isSelected, onDragStart, tutorialStep }) => {
-    const needs = getPatientNeeds(patient);
     const getColorClass = (cat) => {
         if (!patient.triaged) return "neutral-bg";
         if(cat === 'P1') return "p1-bg"; if(cat === 'P2') return "p2-bg"; if(cat === 'P3') return "p3-bg"; return "dead-bg";
@@ -427,20 +427,7 @@ const PatientCard = ({ patient, onSelect, isSelected, onDragStart, tutorialStep 
                 )}
             </div>
             
-            {isRevealed && (
-                 <div className="flex justify-between items-center mt-1">
-                    <div className="flex gap-1">
-                        {needs.map((n, i) => { const Icon = n.icon; return ( <div key={i} className={`rounded-full p-0.5 border ${n.bg} ${n.color} ${n.borderColor}`} title={n.label}><Icon size={12} strokeWidth={2.5} /></div> ); })}
-                        {patient.treated && <div className="bg-emerald-100 text-emerald-700 rounded-full p-0.5"><Check size={12} strokeWidth={3} /></div>}
-                    </div>
-                    {patient.triaged && (
-                        <div className="flex gap-1">
-                            <div className={`w-2 h-2 rounded-full ${patient.vitals.hr > 120 ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} title="HR"></div>
-                            <div className={`w-2 h-2 rounded-full ${patient.vitals.sbp < 90 ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} title="BP"></div>
-                        </div>
-                    )}
-                 </div>
-            )}
+            {isRevealed && <PathwayProgress patient={patient} />}
             
             {isPreAlert && !patient.triaged && <div className="absolute top-1 right-1 bg-red-600 text-white text-[9px] font-black px-1 rounded shadow-sm prealert-flash z-20 border border-white">PRE-ALERT</div>}
             {isDeteriorating && <div className="absolute top-8 right-1 text-red-600 animate-bounce"><TrendingUp size={16} /></div>}
@@ -453,7 +440,7 @@ const PatientCard = ({ patient, onSelect, isSelected, onDragStart, tutorialStep 
     );
 };
 
-const ZoneDisplay = ({ zone, patients, onSelect, selectedPatientId, onDrop, onZoneClick, activeEvent, blockState, tutorialStep }) => {
+const ZoneDisplay = ({ zone, patients, onSelect, selectedPatientId, onDrop, onZoneClick, activeEvent, blockState, tutorialStep, highlightScan }) => {
     const zPatients = patients.filter(p => p.location === zone.id);
     const isBlockedEvent = activeEvent?.id === 'ct_overheat' && zone.id === 'ct';
     const isFlowBlock = blockState && blockState[zone.id];
@@ -465,11 +452,11 @@ const ZoneDisplay = ({ zone, patients, onSelect, selectedPatientId, onDrop, onZo
     const handleClick = (e) => { e.stopPropagation(); if (!isBlocked && selectedPatientId && onZoneClick) onZoneClick(zone.id); };
     const isDropTarget = selectedPatientId && !isBlocked;
 
-    const isTarget = (tutorialStep === 3 && zone.id === 'triage') || (tutorialStep === 5 && zone.id === 'minors');
+    const isScanTarget = zone.id === 'ct' && highlightScan;
 
     return (
         <div onDragOver={e => !isBlocked && e.preventDefault()} onDrop={e => !isBlocked && onDrop(e, zone.id)} onClick={handleClick} onTouchStart={handleClick}
-            className={`border rounded-lg flex flex-col shadow-sm overflow-hidden zone-card ${zone.style} ${isDropTarget ? 'ring-2 ring-emerald-400 ring-opacity-50 animate-pulse' : ''} ${selectedPatientId ? 'dimmed cursor-pointer' : ''} ${isBlocked ? 'opacity-50 pointer-events-none bg-slate-100' : ''} ${isTarget ? 'tutorial-highlight tutorial-pointer-down bg-white' : ''} h-auto relative flex-1 min-h-[120px]`}>
+            className={`border rounded-lg flex flex-col shadow-sm overflow-hidden zone-card ${zone.style} ${isDropTarget ? 'ring-2 ring-emerald-400 ring-opacity-50 animate-pulse' : ''} ${selectedPatientId ? 'dimmed cursor-pointer' : ''} ${isBlocked ? 'opacity-50 pointer-events-none bg-slate-100' : ''} ${isScanTarget ? 'glow-zone-purple' : ''} h-auto relative flex-1 min-h-[120px]`}>
             {isBlocked && <div className="absolute inset-0 flex items-center justify-center bg-slate-800/80 z-10 font-bold text-white text-xs uppercase tracking-widest flex-col gap-2"><ShieldAlert size={24} className="text-red-400" /> BLOCKED</div>}
             <div className="px-2 py-1 border-b flex justify-between items-center bg-white/50">
                 <span className="font-bold text-[10px] uppercase text-slate-500 truncate">{zone.name}</span>
@@ -485,12 +472,10 @@ const ZoneDisplay = ({ zone, patients, onSelect, selectedPatientId, onDrop, onZo
 
 const ActionHUD = ({ patient, role, onAction, onAbility, onClose, activeEvent, isActiveTriage, tutorialStep }) => {
     if (!patient) return null;
-    const pathway = getCarePathway(patient);
     const needs = getPatientNeeds(patient);
     const triageCost = activeEvent?.id === 'it_failure' ? 2 : 1;
     
     const canTriage = needs.some(n => n.id === 'triage') && role.canTriage;
-    const canSecondaryTriage = needs.some(n => n.id === 'secondary_triage') && role.canTriage;
     const canScan = needs.some(n => n.id === 'scan') && role.canScan && activeEvent?.id !== 'ct_overheat';
     const canTreat = needs.some(n => n.id === 'treat') && role.canTreat && (!patient.reqSkill || role.skills.includes(patient.reqSkill));
     
@@ -501,28 +486,23 @@ const ActionHUD = ({ patient, role, onAction, onAbility, onClose, activeEvent, i
     if (canTriage) { 
         mainActionText = `Primary Triage (${triageCost} AP)`; isMainActionEnabled = true; mainActionColor = "bg-blue-600 hover:bg-blue-500"; 
         actionType = 'triage';
-        if(tutorialStep === 4) isTarget = true;
+        if(tutorialStep === 3) isTarget = true;
     }
-    else if (canSecondaryTriage) {
-        mainActionText = `Calculate TRTS (1 AP)`; isMainActionEnabled = true; mainActionColor = "bg-blue-600 hover:bg-blue-500"; 
-        actionType = 'secondary_triage';
-    }
-    else if (canScan) { mainActionText = "Perform CT Scan"; isMainActionEnabled = true; mainActionColor = "bg-purple-600 hover:bg-purple-500"; actionType = 'scan'; }
+    else if (canScan) { mainActionText = "Perform CT Scan (1 AP)"; isMainActionEnabled = true; mainActionColor = "bg-purple-600 hover:bg-purple-500"; actionType = 'scan'; }
     else if (canTreat) { 
-        mainActionText = "Select Treatment"; 
+        mainActionText = "Administer Treatment (1 AP)"; 
         isMainActionEnabled = true; 
         mainActionColor = "bg-emerald-600 hover:bg-emerald-500"; 
         actionType = 'treat';
-        if(tutorialStep === 7) isTarget = true;
+        if(tutorialStep === 5) isTarget = true;
     }
-    else if (needs.some(n => n.id === 'secondary_triage')) { mainActionText = "Needs TRTS Assessment"; mainActionColor = "bg-slate-700 text-slate-400"; }
     else if (needs.some(n => n.id === 'scan')) { mainActionText = activeEvent?.id === 'ct_overheat' ? "Scanner Broken" : "Needs CT Scan First"; mainActionColor = "bg-slate-700 text-slate-400"; }
     else if (needs.some(n => n.id === 'treat')) { mainActionText = patient.reqSkill === 'advanced_trauma' ? "Requires Doctor (Trauma)" : "Requires Clinical Role"; mainActionColor = "bg-slate-700 text-slate-400"; }
     else if (patient.treated) { mainActionText = "Patient Stable"; mainActionColor = "bg-emerald-800 text-emerald-200"; }
 
     return (
         <div className="w-full bg-slate-900/95 backdrop-blur-md text-white border-t border-slate-700 shadow-2xl z-50 hud-enter flex flex-col lg:flex-row h-auto lg:h-[240px] shrink-0">
-            <div className="p-4 flex items-center gap-4 border-b lg:border-b-0 lg:border-r border-slate-700 w-full lg:w-1/3 bg-slate-800/50 shrink-0">
+            <div className="p-4 flex items-center gap-4 border-b lg:border-b-0 lg:border-r border-slate-700 w-full lg:w-1/2 bg-slate-800/50 shrink-0">
                 <StickFigure injuryLoc={patient.injuryLoc} className="h-16 w-16 lg:h-20 lg:w-20 text-slate-300" />
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -534,88 +514,24 @@ const ActionHUD = ({ patient, role, onAction, onAbility, onClose, activeEvent, i
                 </div>
                 <button onClick={onClose} className="lg:hidden p-2 text-slate-500 hover:text-white"><X size={20}/></button>
             </div>
-            <div className="p-4 flex-1 border-b lg:border-b-0 lg:border-r border-slate-700 bg-slate-900/50 overflow-y-auto min-h-[100px] flex flex-col">
-                <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-3">Clinical Pathway</div>
-                <div className="flex flex-col gap-3">
-                    {pathway.map((step) => {
-                        const isActive = step.status === 'current';
-                        const isDone = step.status === 'done';
-                        const StepIcon = step.icon;
-                        return (
-                            <div key={step.id} className={`flex items-center gap-3 ${isActive ? 'opacity-100' : 'opacity-50'}`}>
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 shrink-0 ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : (isActive ? 'bg-blue-600 border-blue-400 text-white animate-pulse' : 'bg-slate-800 border-slate-600 text-slate-500')}`}>
-                                    {isDone ? <Check size={12} strokeWidth={4} /> : <StepIcon size={12} />}
-                                </div>
-                                <div className="flex-1">
-                                    <div className={`text-xs font-bold ${isActive ? 'text-white' : 'text-slate-400'}`}>{step.label}</div>
-                                </div>
-                            </div>
-                        );
-                    })}
+            
+            <div className="p-4 w-full lg:w-1/2 flex flex-col gap-2 bg-slate-800/30 shrink-0 justify-center">
+                <div className="flex justify-between items-center text-xs text-slate-400 uppercase font-bold mb-1">
+                    <span>Role: {role.name}</span>
+                    <span className={role.currentAp === 0 ? "text-red-400" : "text-emerald-400"}>AP: {role.currentAp} / {role.ap}</span>
                 </div>
-            </div>
-            <div className="p-4 w-full lg:w-1/3 flex flex-col gap-2 bg-slate-800/30 shrink-0 justify-center">
-                <div className="flex justify-between items-center text-xs text-slate-400 uppercase font-bold mb-1"><span>Role: {role.name}</span><span>AP: {role.currentAp}/{role.ap}</span></div>
                 <button onClick={() => onAction(actionType)} disabled={!isMainActionEnabled || role.currentAp < (actionType === 'triage' && activeEvent?.id === 'it_failure' ? 2 : 1)} className={`flex-1 py-4 rounded-xl font-bold text-base shadow-lg transition-all flex items-center justify-center gap-2 ${mainActionColor} disabled:opacity-50 disabled:cursor-not-allowed ${isTarget ? 'tutorial-highlight tutorial-pointer-up bg-white text-blue-600' : ''}`}>
-                    {(canTriage || canSecondaryTriage) && <ClipboardCheck size={20} />}
+                    {canTriage && <ClipboardCheck size={20} />}
                     {canScan && <Scan size={20} />}
                     {canTreat && <Stethoscope size={20} />}
                     {mainActionText}
                 </button>
-                <button onClick={onAbility} disabled={role.abilityCost === 'ALL' ? role.currentAp < 1 : role.currentAp < role.abilityCost} className="py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 border border-slate-600">
+                <button onClick={onAbility} disabled={role.cooldown > 0 || role.currentAp < (role.abilityCost === 'ALL' ? 1 : role.abilityCost)} className="py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 border border-slate-600">
                     <ShieldAlert size={18} />{role.ability}: {role.abilityEffect}
-                    <span className="bg-black/20 px-1.5 rounded text-xs">{role.abilityCost} AP</span>
+                    {role.cooldown > 0 && <span className="text-amber-400 ml-1">(Wait {role.cooldown})</span>}
                 </button>
             </div>
             <button onClick={onClose} className="absolute top-0 right-0 p-2 text-slate-500 hover:text-white hidden lg:block"><X size={16}/></button>
-        </div>
-    );
-};
-
-const TRTSModal = ({ patient, onClose, onConfirm }) => {
-    const gcsScore = patient.vitals.gcs >= 13 ? 4 : patient.vitals.gcs >= 9 ? 3 : patient.vitals.gcs >= 6 ? 2 : patient.vitals.gcs >= 4 ? 1 : 0;
-    const sbpScore = patient.vitals.sbp > 89 ? 4 : patient.vitals.sbp >= 76 ? 3 : patient.vitals.sbp >= 50 ? 2 : patient.vitals.sbp >= 1 ? 1 : 0;
-    const rrScore = patient.vitals.rr >= 10 && patient.vitals.rr <= 29 ? 4 : patient.vitals.rr > 29 ? 3 : patient.vitals.rr >= 6 ? 2 : patient.vitals.rr >= 1 ? 1 : 0;
-    const total = gcsScore + sbpScore + rrScore;
-
-    return (
-        <div className="fixed inset-0 bg-slate-900/90 flex items-center justify-center z-[100] p-4 modal-enter">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200 flex flex-col relative">
-                <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
-                    <div className="flex items-center gap-2">
-                        <Activity size={18} className="text-blue-600" />
-                        <h2 className="text-sm font-black text-slate-800 uppercase tracking-wide">Secondary Triage</h2>
-                    </div>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={20} className="text-slate-400" /></button>
-                </div>
-                <div className="p-6 bg-slate-50/50 space-y-4">
-                    <p className="text-sm text-slate-600 mb-4 text-center">Calculate Triage Revised Trauma Score (TRTS)</p>
-                    
-                    <div className="flex justify-between items-center bg-white p-3 rounded border shadow-sm">
-                        <span className="font-bold text-slate-700">Glasgow Coma Scale</span>
-                        <div className="flex items-center gap-3"><span className="text-lg font-black text-slate-900">{patient.vitals.gcs}</span><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">+{gcsScore}</span></div>
-                    </div>
-                    
-                    <div className="flex justify-between items-center bg-white p-3 rounded border shadow-sm">
-                        <span className="font-bold text-slate-700">Systolic BP</span>
-                        <div className="flex items-center gap-3"><span className="text-lg font-black text-slate-900">{patient.vitals.sbp}</span><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">+{sbpScore}</span></div>
-                    </div>
-
-                    <div className="flex justify-between items-center bg-white p-3 rounded border shadow-sm">
-                        <span className="font-bold text-slate-700">Respiratory Rate</span>
-                        <div className="flex items-center gap-3"><span className="text-lg font-black text-slate-900">{patient.vitals.rr}</span><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">+{rrScore}</span></div>
-                    </div>
-
-                    <div className="mt-6 text-center">
-                        <span className="text-xs uppercase font-bold text-slate-400 block mb-1">Total TRTS Score</span>
-                        <span className={`text-4xl font-black ${total <= 10 ? 'text-red-600' : 'text-emerald-600'}`}>{total}</span>
-                        <p className="text-xs text-slate-500 mt-2">{total <= 10 ? 'Score ≤ 10 indicates Priority 1 Trauma' : 'Score 11-12 indicates Priority 2 or 3'}</p>
-                    </div>
-                </div>
-                <div className="p-4 bg-white border-t">
-                    <button onClick={() => onConfirm(total)} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow">Confirm Assessment</button>
-                </div>
-            </div>
         </div>
     );
 };
@@ -636,7 +552,7 @@ const TreatmentModal = ({ patient, onClose, onSelectTreatment, tutorialStep }) =
                     
                     <div className="space-y-3">
                         {patient.treatments.map((t) => {
-                            const isTarget = tutorialStep === 8 && t.correct;
+                            const isTarget = tutorialStep === 6 && t.correct;
                             return (
                                 <button key={t.id} onClick={() => onSelectTreatment(t)} className={`w-full text-left p-4 bg-white border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 rounded-xl transition-all font-bold text-slate-800 shadow-sm flex justify-between items-center group ${isTarget ? 'tutorial-highlight tutorial-pointer-right' : ''}`}>
                                     {t.label}
@@ -817,7 +733,7 @@ const initialGameState = {
     roleStates: [], currentRoleId: null, patients: [],
     resources: { blood: 20, vents: 8 }, simTime: 12 * 60,
     activeEvent: null, gameOverType: null, modalContent: null,
-    selectedScenario: 'standard', phase: 'active', blockState: { icu: false, ward: false }
+    selectedScenario: 'standard', difficulty: 'standard', phase: 'active', blockState: { icu: false, ward: false }
 };
 
 function gameReducer(state, action) {
@@ -839,10 +755,10 @@ const App = () => {
     const [state, dispatch] = useReducer(gameReducer, initialGameState);
     const [playerCount, setPlayerCount] = useState(1);
     const [staffCounts, setStaffCounts] = useState({ senior: 1, resident: 2, nurse: 3 });
+    const [difficulty, setDifficulty] = useState('standard');
     const [isPrefilled, setIsPrefilled] = useState(false);
     const [isActiveTriageMode, setIsActiveTriageMode] = useState(false); 
     const [triageTarget, setTriageTarget] = useState(null); 
-    const [secondaryTriageTarget, setSecondaryTriageTarget] = useState(null);
     const [treatmentTarget, setTreatmentTarget] = useState(null);
     const [selectedPatientId, setSelectedPatientId] = useState(null);
     const [isSidebarOpen, setSidebarOpen] = useState(false);
@@ -857,6 +773,14 @@ const App = () => {
     
     const currentRole = state.roleStates.find(r => r.id === state.currentRoleId);
     const selectedPatient = state.patients.find(p => p.uniqueId === selectedPatientId);
+
+    const highlightSenior = useMemo(() => {
+        return state.patients.some(p => p.category === 'P1' && p.triaged && !p.treated && !['morgue', 'discharged'].includes(p.location));
+    }, [state.patients]);
+
+    const highlightRadiology = useMemo(() => {
+        return state.patients.some(p => p.triaged && !p.treated && !p.scanned && (p.injuryLoc === 'head' || p.injuryLoc === 'abdo'));
+    }, [state.patients]);
 
     const addToast = (msg, type = 'info') => {
         const id = Date.now();
@@ -887,26 +811,24 @@ const App = () => {
         if (tutorialStep === 0) return;
         if (tutorialStep === 1 && state.currentRoleId === 'nurse_ic') setTutorialStep(2);
         if (tutorialStep === 2 && selectedPatientId === 99999) setTutorialStep(3);
-        if (tutorialStep === 3 && selectedPatient?.location === 'triage') setTutorialStep(4);
-        if (tutorialStep === 4 && selectedPatient?.triaged) setTutorialStep(5);
-        if (tutorialStep === 5 && selectedPatient?.location === 'minors') setTutorialStep(6);
-        if (tutorialStep === 6 && state.currentRoleId?.startsWith('nurse_staff')) setTutorialStep(7);
-        if (tutorialStep === 7 && treatmentTarget) setTutorialStep(8);
-        if (tutorialStep === 8 && selectedPatient?.treated) setTutorialStep(9);
-        if (tutorialStep === 9 && state.discharged > 0) {
-            setTutorialStep(10);
+        if (tutorialStep === 3 && selectedPatient?.triaged) setTutorialStep(4);
+        if (tutorialStep === 4 && state.currentRoleId?.startsWith('nurse_staff')) setTutorialStep(5);
+        if (tutorialStep === 5 && state.difficulty === 'advanced' && treatmentTarget) setTutorialStep(6);
+        if (tutorialStep === 5 && state.difficulty !== 'advanced' && selectedPatient?.treated) setTutorialStep(7);
+        if (tutorialStep === 6 && selectedPatient?.treated) setTutorialStep(7);
+        if (tutorialStep === 7 && state.discharged > 0) {
             setTimeout(() => {
                 addToast("Tutorial Complete!", 'success');
                 setTutorialStep(0);
                 dispatch({ type: 'START_GAME', payload: initialGameState });
             }, 3000);
         }
-    }, [state.currentRoleId, selectedPatientId, state.patients, tutorialStep, treatmentTarget, state.discharged]);
+    }, [state.currentRoleId, selectedPatientId, state.patients, tutorialStep, treatmentTarget, state.discharged, state.difficulty]);
 
     const handleRoleClick = (r) => {
         if (tutorialStep > 0) {
             if (tutorialStep === 1 && r.id !== 'nurse_ic') return;
-            if (tutorialStep === 6 && !r.id.startsWith('nurse_staff')) return;
+            if (tutorialStep === 4 && !r.id.startsWith('nurse_staff')) return;
         }
         if(!r.disabled) { 
             dispatch({ type: 'UPDATE_STATE', payload: { currentRoleId: r.id } }); 
@@ -919,31 +841,48 @@ const App = () => {
         setSelectedPatientId(id);
     };
 
+    const deductAp = (cost) => { 
+        dispatch({ 
+            type: 'UPDATE_STATE', 
+            payload: { roleStates: state.roleStates.map(r => r.id === state.currentRoleId ? { ...r, currentAp: Math.max(0, r.currentAp - cost) } : r) } 
+        }); 
+    };
+
     const handleActionClick = (actionType) => {
         if(!selectedPatient || !currentRole || currentRole.disabled) return;
         
         if (tutorialStep > 0) {
-            if (tutorialStep === 4 && actionType !== 'triage') return;
-            if (tutorialStep === 7 && actionType !== 'treat') return;
+            if (tutorialStep === 3 && actionType !== 'triage') return;
+            if (tutorialStep === 5 && actionType !== 'treat') return;
         }
 
         pushHistory();
         
         if (actionType === 'triage') {
-            if (selectedPatient.location === 'amb') { addToast("Move to Triage Bay to assess", "warning"); return; }
+            const triageCost = state.activeEvent?.id === 'it_failure' ? 2 : 1;
+            if (currentRole.currentAp < triageCost) { addToast(`Not enough AP! (${triageCost} required)`, "error"); return; }
+            if (selectedPatient.location === 'amb' && state.patients.filter(p=>p.location==='triage').length >= ZONES.find(z=>z.id==='triage').capacity) {
+                addToast("Triage Bay is full! Cannot offload.", 'error');
+                return;
+            }
             if (isActiveTriageMode && !selectedPatient.triaged) { setTriageTarget(selectedPatient); return; }
             performTriage(selectedPatient, true, false);
-        } else if (actionType === 'secondary_triage') {
-            setSecondaryTriageTarget(selectedPatient);
         } else if (actionType === 'scan') {
+            if (currentRole.currentAp < 1) { addToast("Not enough AP!", "error"); return; }
             const newPatients = state.patients.map(p => p.uniqueId === selectedPatientId ? addHistory({ ...p, scanned: true }, "CT Scan Completed") : p);
             dispatch({ type: 'UPDATE_STATE', payload: { patients: newPatients } });
             deductAp(1);
-            addToast("Scan Completed", "success");
+            addToast("Scan Completed via CT", "success");
         } else if (actionType === 'treat') {
+            if (currentRole.currentAp < 1) { addToast("Not enough AP!", "error"); return; }
             if (selectedPatient.reqSkill === 'advanced_trauma' && !currentRole.skills.includes('advanced_trauma')) { addToast("Requires Senior Doctor skill", "error"); return; }
             if ((selectedPatient.injuryLoc==='head'||selectedPatient.injuryLoc==='abdo') && !selectedPatient.scanned) { addToast("Patient requires CT Scan first", "warning"); return; }
-            setTreatmentTarget(selectedPatient);
+            
+            if (state.difficulty === 'advanced') {
+                setTreatmentTarget(selectedPatient);
+            } else {
+                handleTreatmentConfirm({ label: selectedPatient.treatmentAction, correct: true }, selectedPatient);
+            }
         }
     };
 
@@ -958,77 +897,74 @@ const App = () => {
                  scoreMod -= 5; logMsg += ` - Incorrect`; addToast(`Incorrect! Patient is ${patient.category}`, 'error');
             }
         }
-        const newPatients = state.patients.map(p => p.uniqueId === patient.uniqueId ? addHistory({ ...p, triaged: true }, logMsg) : p);
+        
+        let targetLocation = patient.location;
+        if (patient.location === 'amb') {
+            targetLocation = 'triage';
+            playAudio('move');
+        }
+
+        const newPatients = state.patients.map(p => p.uniqueId === patient.uniqueId ? addHistory({ ...p, triaged: true, location: targetLocation }, logMsg) : p);
         deductAp(triageCost);
         dispatch({ type: 'UPDATE_STATE', payload: { patients: newPatients, score: scoreMod } });
     };
 
-    const handleSecondaryTriageConfirm = (score) => {
-        if (!secondaryTriageTarget) return;
-        const newPatients = state.patients.map(p => p.uniqueId === secondaryTriageTarget.uniqueId ? addHistory({ ...p, secondaryTriaged: true }, `TRTS Score: ${score}`) : p);
-        deductAp(1);
-        dispatch({ type: 'UPDATE_STATE', payload: { patients: newPatients } });
-        setSecondaryTriageTarget(null);
-        addToast("Secondary Triage Complete", "success");
-    };
-
-    const handleTreatmentConfirm = (treatment) => {
-        if (!treatmentTarget) return;
+    const handleTreatmentConfirm = (treatment, directTarget = null) => {
+        const targetPatient = directTarget || treatmentTarget;
+        if (!targetPatient) return;
         
-        if (tutorialStep > 0 && (tutorialStep === 8 && !treatment.correct)) {
+        if (tutorialStep > 0 && (tutorialStep === 6 && !treatment.correct)) {
             addToast("Select the correct treatment for the tutorial.", "warning");
             return;
         }
 
+        let targetZoneId = targetPatient.category === 'P1' ? 'resus' : (targetPatient.category === 'P2' ? 'majors' : 'minors');
+        if (targetPatient.location !== targetZoneId) {
+            const zoneCap = ZONES.find(z => z.id === targetZoneId).capacity;
+            const currentInZone = state.patients.filter(p => p.location === targetZoneId).length;
+            if (currentInZone >= zoneCap) {
+                addToast(`Cannot treat: ${ZONES.find(z => z.id === targetZoneId).name} is full!`, 'error');
+                if(!directTarget) setTreatmentTarget(null);
+                return;
+            }
+        } else {
+            targetZoneId = targetPatient.location; 
+        }
+
         let newBlood = state.resources.blood;
-        if (treatmentTarget.category === 'P1') {
-            if (newBlood < 1) { addToast("Insufficient Blood Supply", "error"); setTreatmentTarget(null); return; }
+        if (targetPatient.category === 'P1') {
+            if (newBlood < 1) { addToast("Insufficient Blood Supply", "error"); if(!directTarget) setTreatmentTarget(null); return; }
             newBlood--;
         }
 
         if (treatment.correct) {
-            const newPatients = state.patients.map(p => p.uniqueId === treatmentTarget.uniqueId ? addHistory({ ...p, treated: true, deteriorating: false }, treatment.label) : p);
+            const newPatients = state.patients.map(p => p.uniqueId === targetPatient.uniqueId ? addHistory({ ...p, treated: true, deteriorating: false, location: targetZoneId }, treatment.label) : p);
             dispatch({ type: 'UPDATE_STATE', payload: { patients: newPatients, resources: { ...state.resources, blood: newBlood }, score: state.score + 10 } });
             playAudio('treat');
             addToast("Correct Treatment Administered", "success");
         } else {
-            const newVitals = { ...treatmentTarget.vitals, hr: treatmentTarget.vitals.hr + 30, sbp: treatmentTarget.vitals.sbp - 20 };
-            const newPatients = state.patients.map(p => p.uniqueId === treatmentTarget.uniqueId ? addHistory({ ...p, vitals: newVitals, deteriorating: true }, `Incorrect Rx: ${treatment.label}`) : p);
+            const newVitals = { ...targetPatient.vitals, hr: targetPatient.vitals.hr + 30, sbp: targetPatient.vitals.sbp - 20 };
+            const newPatients = state.patients.map(p => p.uniqueId === targetPatient.uniqueId ? addHistory({ ...p, vitals: newVitals, deteriorating: true, location: targetZoneId }, `Incorrect Rx: ${treatment.label}`) : p);
             dispatch({ type: 'UPDATE_STATE', payload: { patients: newPatients, resources: { ...state.resources, blood: newBlood }, score: state.score - 10 } });
             addToast("Incorrect Treatment! Patient Deteriorating.", "error");
         }
         
         deductAp(1);
-        setTreatmentTarget(null);
-    };
-
-    const deductAp = (cost) => { 
-        dispatch({ 
-            type: 'UPDATE_STATE', 
-            payload: { roleStates: state.roleStates.map(r => r.id === state.currentRoleId ? { ...r, currentAp: Math.max(0, r.currentAp - cost) } : r) } 
-        }); 
+        if(!directTarget) setTreatmentTarget(null);
     };
 
     const handleAbility = () => {
-        if(!currentRole || currentRole.disabled) return;
+        if(!currentRole || currentRole.disabled || currentRole.currentAp < (currentRole.abilityCost === 'ALL' ? 1 : currentRole.abilityCost) || currentRole.cooldown > 0) return;
         pushHistory();
 
-        if (currentRole.ability === 'Rest Staff') {
-            dispatch({ type: 'UPDATE_STATE', payload: { roleStates: state.roleStates.map(r => r.id === state.currentRoleId ? { ...r, currentAp: r.ap, fatigued: false, consecutiveZeroAp: 0 } : r) } });
-            addToast("Staff member rested", "success");
-            return;
-        }
-
         if (currentRole.ability === 'Clear Block') {
-            if (currentRole.currentAp < currentRole.abilityCost) return;
             deductAp(currentRole.abilityCost);
-            dispatch({ type: 'UPDATE_STATE', payload: { blockState: { icu: false, ward: false } } });
+            dispatch({ type: 'UPDATE_STATE', payload: { blockState: { icu: false, ward: false }, roleStates: state.roleStates.map(r => r.id === state.currentRoleId ? { ...r, cooldown: currentRole.maxCooldown } : r) } });
             addToast("Hospital Flow Block Cleared", "success");
             return;
         }
         
         if (currentRole.ability === 'Rapid Offload') {
-            if (currentRole.currentAp < 1) { addToast("Requires at least 1 AP", "error"); return; }
             const ambPatients = state.patients.filter(p => p.location === 'amb');
             if (ambPatients.length === 0) { addToast("Ambulance Bay Empty", "info"); return; }
             const triageZone = ZONES.find(z => z.id === 'triage');
@@ -1037,42 +973,46 @@ const App = () => {
             
             const toMove = ambPatients.slice(0, spaces);
             const newPatients = state.patients.map(p => toMove.find(tm => tm.uniqueId === p.uniqueId) ? addHistory({ ...p, location: 'triage', triaged: true }, "Rapid MITT Assessment") : p);
-            dispatch({ type: 'UPDATE_STATE', payload: { patients: newPatients } });
             deductAp(currentRole.currentAp);
+            dispatch({ type: 'UPDATE_STATE', payload: { patients: newPatients, roleStates: state.roleStates.map(r => r.id === state.currentRoleId ? { ...r, cooldown: currentRole.maxCooldown } : r) } });
             playAudio('move');
             addToast(`Rapidly Offloaded ${toMove.length} patients`, "success");
             return;
         }
-
-        if(currentRole.currentAp < currentRole.abilityCost) return;
         
-        if(currentRole.id.startsWith('senior_doc')) { deductAp(currentRole.abilityCost); dispatch({ type: 'UPDATE_STATE', payload: { patients: state.patients.map(p => p.location === 'amb' ? addHistory({...p, triaged: true}, `Rapid Triage`) : p) } }); addToast("Rapid Triage Complete", "info"); }
-        else if(currentRole.id.startsWith('nurse_staff')) {
-            if(!selectedPatientId) return;
+        if(currentRole.id.startsWith('senior_doc')) { 
             deductAp(currentRole.abilityCost);
-            dispatch({ type: 'UPDATE_STATE', payload: { patients: state.patients.map(p => p.uniqueId === selectedPatientId ? addHistory({ ...p, deteriorating: false, turnsWaiting: 0 }, "Stabilised by Nurse") : p) } });
+            dispatch({ type: 'UPDATE_STATE', payload: { patients: state.patients.map(p => p.location === 'amb' ? addHistory({...p, triaged: true, location: 'triage'}, `Rapid Triage`) : p), roleStates: state.roleStates.map(r => r.id === state.currentRoleId ? { ...r, cooldown: currentRole.maxCooldown } : r) } }); 
+            addToast("Rapid Triage Complete", "info"); 
+        }
+        else if(currentRole.id.startsWith('nurse_staff')) {
+            if(!selectedPatientId) { addToast("Select a Patient first", "warning"); return; }
+            deductAp(currentRole.abilityCost);
+            dispatch({ type: 'UPDATE_STATE', payload: { patients: state.patients.map(p => p.uniqueId === selectedPatientId ? addHistory({ ...p, deteriorating: false, turnsWaiting: 0 }, "Stabilised by Nurse") : p), roleStates: state.roleStates.map(r => r.id === state.currentRoleId ? { ...r, cooldown: currentRole.maxCooldown } : r) } });
             playAudio('treat'); addToast(`Patient Stabilised`, "success");
         }
         else if(currentRole.id.startsWith('resident')) {
-            deductAp(currentRole.abilityCost);
             const p3 = state.patients.find(p => p.category === 'P3' && !p.treated && p.location === 'minors');
-            if(p3) { dispatch({ type: 'UPDATE_STATE', payload: { patients: state.patients.map(p => p.uniqueId === p3.uniqueId ? addHistory({ ...p, treated: true }, "Fast Track Treatment") : p) } }); playAudio('treat'); addToast("Fast Track Treatment Complete", "success"); }
+            if(p3) { 
+                deductAp(currentRole.abilityCost);
+                dispatch({ type: 'UPDATE_STATE', payload: { patients: state.patients.map(p => p.uniqueId === p3.uniqueId ? addHistory({ ...p, treated: true }, "Fast Track Treatment") : p), roleStates: state.roleStates.map(r => r.id === state.currentRoleId ? { ...r, cooldown: currentRole.maxCooldown } : r) } }); 
+                playAudio('treat'); addToast("Fast Track Treatment Complete", "success"); 
+            } else { addToast("No P3 patients in Minors", "info"); }
         }
         else if(currentRole.id === 'radiology') {
-            deductAp(currentRole.abilityCost);
-            const target = state.patients.find(p => (p.location === 'resus' || p.location === 'majors') && !p.treated && !p.scanned);
-            if(target) { dispatch({ type: 'UPDATE_STATE', payload: { patients: state.patients.map(p => p.uniqueId === target.uniqueId ? addHistory({ ...p, location: 'ct' }, "Rapid Scan Transfer") : p) } }); addToast("Patient moved to CT", "info"); }
+            const target = state.patients.find(p => (p.location === 'resus' || p.location === 'majors') && !p.treated && !p.scanned && (p.injuryLoc === 'head' || p.injuryLoc === 'abdo'));
+            if(target) { 
+                deductAp(currentRole.abilityCost);
+                dispatch({ type: 'UPDATE_STATE', payload: { patients: state.patients.map(p => p.uniqueId === target.uniqueId ? addHistory({ ...p, scanned: true }, "Rapid Scan Transfer") : p), roleStates: state.roleStates.map(r => r.id === state.currentRoleId ? { ...r, cooldown: currentRole.maxCooldown } : r) } }); 
+                addToast("Patient Rapidly Scanned", "info"); 
+            } else { addToast("No suitable patients need scanning", "info"); }
         }
     };
 
     const handleDrop = (e, zoneId) => {
         if (e && e.preventDefault) e.preventDefault();
         
-        if (tutorialStep > 0) {
-            if (tutorialStep === 3 && zoneId !== 'triage') return;
-            if (tutorialStep === 5 && zoneId !== 'minors') return;
-            if (tutorialStep === 9 && zoneId !== 'discharged') return;
-        }
+        if (tutorialStep > 0 && tutorialStep !== 7) return;
 
         const pid = e && e.dataTransfer ? Number(e.dataTransfer.getData("patientId")) : selectedPatientId;
         const p = state.patients.find(pt => pt.uniqueId === pid);
@@ -1134,7 +1074,8 @@ const App = () => {
                 roleStates: generatedRoles, 
                 currentRoleId: generatedRoles[0].id, 
                 patients: finalPatients,
-                resources: { blood: initialBlood, vents: 8 }
+                resources: { blood: initialBlood, vents: 8 },
+                difficulty: state.difficulty
             } 
         });
         localStorage.removeItem('wmebem_save');
@@ -1158,7 +1099,6 @@ const App = () => {
             uniqueId: overrideProps.id || Date.now() + Math.random(), 
             location: 'amb', 
             triaged: false, 
-            secondaryTriaged: false,
             treated: false, 
             scanned: false, 
             deteriorating: false,
@@ -1232,11 +1172,12 @@ const App = () => {
         dispatch({ 
             type: 'START_GAME', 
             payload: { 
-                roleStates: generatedRoles.map(r => ({ ...r, currentAp: 4, ap: 4, disabled: false })), 
+                roleStates: generatedRoles.map(r => ({...r, currentAp: 4})), 
                 currentRoleId: null, 
                 patients: [tutPatient],
                 activeEvent: null,
-                phase: 'active'
+                phase: 'active',
+                difficulty: 'advanced'
             } 
         });
         setIsActiveTriageMode(false);
@@ -1253,6 +1194,8 @@ const App = () => {
     };
 
     const triggerEvent = (currentRoles) => {
+        if (state.difficulty === 'novice') return { event: null, roles: currentRoles, blocks: { icu: false, ward: false } };
+
         if (Math.random() > 0.7) {
             const event = RANDOM_EVENTS[Math.floor(Math.random() * RANDOM_EVENTS.length)];
             playAudio('alert');
@@ -1270,6 +1213,8 @@ const App = () => {
                 } 
             } 
             else if (event.id === 'rapid_offload' && state.phase === 'active') { spawnPatients(3, state.simTime); }
+            else if (event.id === 'med_student') { return { event, roles: currentRoles.map(r => r.id.startsWith('senior_doc') ? { ...r, currentAp: r.currentAp + 2 } : r), blocks: newBlocks }; }
+            
             return { event, roles: currentRoles, blocks: newBlocks };
         } 
         return { event: null, roles: currentRoles, blocks: { icu: false, ward: false } };
@@ -1302,15 +1247,7 @@ const App = () => {
         const newTime = state.simTime + 15; 
         
         let newRoles = state.roleStates.map(r => {
-            let zeroAp = r.currentAp === 0 ? r.consecutiveZeroAp + 1 : 0;
-            let isFatigued = zeroAp >= 2 || r.fatigued;
-            let maxAp = isFatigued ? Math.max(1, Math.floor(r.ap / 2)) : r.ap;
-            
-            let ability = isFatigued ? 'Rest Staff' : ROLE_TEMPLATES[r.id.replace(/_\d+$/, '')].ability;
-            let abilityCost = isFatigued ? 'ALL' : ROLE_TEMPLATES[r.id.replace(/_\d+$/, '')].abilityCost;
-            let abilityEffect = isFatigued ? 'Clear Fatigue' : ROLE_TEMPLATES[r.id.replace(/_\d+$/, '')].abilityEffect;
-
-            return { ...r, currentAp: maxAp, disabled: false, consecutiveZeroAp: zeroAp, fatigued: isFatigued, ability, abilityCost, abilityEffect };
+            return { ...r, currentAp: r.ap, disabled: false, cooldown: Math.max(0, r.cooldown - 1) };
         });
 
         const eventResult = triggerEvent(newRoles);
@@ -1377,15 +1314,30 @@ const App = () => {
                     <p className="text-slate-500 mb-6 font-medium">WMEBEM Digital Simulation</p>
                     <div className="mb-6 space-y-4 text-left">
                         {localStorage.getItem('wmebem_save') && <button type="button" onClick={loadGame} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold mb-4 cursor-pointer">Resume Simulation</button>}
+                        
                         <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide text-center">Difficulty Tier</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                <button type="button" onClick={() => setDifficulty('novice')} className={`p-2 rounded border text-xs font-bold cursor-pointer ${difficulty === 'novice' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Novice</button>
+                                <button type="button" onClick={() => setDifficulty('standard')} className={`p-2 rounded border text-xs font-bold cursor-pointer ${difficulty === 'standard' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Standard</button>
+                                <button type="button" onClick={() => setDifficulty('advanced')} className={`p-2 rounded border text-xs font-bold cursor-pointer ${difficulty === 'advanced' ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Advanced</button>
+                            </div>
+                            <p className="text-[10px] text-gray-500 mt-2 text-center italic h-8">
+                                {difficulty === 'novice' && 'Basic gameplay. Generic treatment actions. No random events.'}
+                                {difficulty === 'standard' && 'Introduces random events and hospital exit blocks.'}
+                                {difficulty === 'advanced' && 'Adds METHANE pre-deployment and specific targeted clinical interventions.'}
+                            </p>
+                        </div>
+
+                        <div className="border-t pt-4">
                             <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide text-center">Scenario Selection</label>
                             <div className="grid grid-cols-2 gap-2">
                                 {Object.entries(SCENARIOS).map(([key, val]) => (
-                                    <button type="button" key={key} onClick={() => dispatch({ type: 'UPDATE_STATE', payload: { selectedScenario: key } })} className={`p-2 rounded border text-xs font-bold cursor-pointer ${state.selectedScenario === key ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>{val.name}</button>
+                                    <button type="button" key={key} onClick={() => dispatch({ type: 'UPDATE_STATE', payload: { selectedScenario: key } })} className={`p-2 rounded border text-xs font-bold cursor-pointer ${state.selectedScenario === key ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>{val.name}</button>
                                 ))}
                             </div>
-                            <p className="text-xs text-gray-500 mt-1 text-center italic">{SCENARIOS[state.selectedScenario].desc}</p>
                         </div>
+
                         <div className="border-t pt-4 space-y-2">
                             <Counter label="Senior Docs" value={staffCounts.senior} onChange={(v)=>setStaffCounts({...staffCounts, senior: v})} min={1} max={3} />
                             <Counter label="Residents" value={staffCounts.resident} onChange={(v)=>setStaffCounts({...staffCounts, resident: v})} min={1} max={6} />
@@ -1393,7 +1345,41 @@ const App = () => {
                         </div>
                     </div>
                     <div className="flex flex-col gap-3">
-                        <button type="button" onClick={() => dispatch({ type: 'UPDATE_STATE', payload: { gameState: 'methane' } })} className="w-full py-4 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all transform active:scale-95 cursor-pointer">Initialise New Incident</button>
+                        <button type="button" onClick={() => {
+                            if (difficulty === 'advanced') {
+                                dispatch({ type: 'UPDATE_STATE', payload: { gameState: 'methane', difficulty } });
+                            } else {
+                                dispatch({ type: 'UPDATE_STATE', payload: { difficulty } });
+                                const generatedRoles = generateRoster(staffCounts);
+                                const initialTime = 12 * 60;
+                                const incidentPatients = [];
+                                const scenarioConfig = SCENARIOS[state.selectedScenario];
+                                for(let i=0; i<6; i++) {
+                                    const r = Math.random();
+                                    let cat = 'P3';
+                                    if (r < scenarioConfig.p1) cat = 'P1';
+                                    else if (r < scenarioConfig.p1 + scenarioConfig.p2) cat = 'P2';
+                                    let pool = PATIENT_TEMPLATES.standard;
+                                    if (scenarioConfig.type === 'chem' && Math.random() > 0.3) pool = PATIENT_TEMPLATES.chem;
+                                    if (scenarioConfig.type === 'crush' && Math.random() > 0.3) pool = PATIENT_TEMPLATES.crush;
+                                    let options = pool.filter(p => p.category === cat);
+                                    if (options.length === 0) options = pool;
+                                    const base = options[Math.floor(Math.random() * options.length)];
+                                    incidentPatients.push(createPatient(base, formatTime(initialTime), { category: cat }));
+                                }
+                                dispatch({ 
+                                    type: 'START_GAME', 
+                                    payload: { 
+                                        roleStates: generatedRoles, 
+                                        currentRoleId: generatedRoles[0].id, 
+                                        patients: incidentPatients,
+                                        resources: { blood: 20, vents: 8 },
+                                        difficulty
+                                    } 
+                                });
+                                localStorage.removeItem('wmebem_save');
+                            }
+                        }} className="w-full py-4 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all transform active:scale-95 cursor-pointer">Initialise New Incident</button>
                         <button type="button" onClick={startTutorial} className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-md shadow transition-all cursor-pointer">Launch Training Protocol</button>
                     </div>
                 </div>
@@ -1418,13 +1404,11 @@ const App = () => {
                     <TutorialOverlay step={tutorialStep}>
                         {tutorialStep === 1 && "Welcome Commander. Let's process a casualty. Select the Nurse In Charge from the staff list."}
                         {tutorialStep === 2 && "Select the waiting patient in the Ambulance Bay."}
-                        {tutorialStep === 3 && "Move the patient to the Triage zone to assess them."}
-                        {tutorialStep === 4 && "Tap the Primary Triage button to determine their priority."}
-                        {tutorialStep === 5 && "They are Priority 3. They need minor treatment. Move them to the Minors zone."}
-                        {tutorialStep === 6 && "They need clinical care. Select an ED Nurse from the staff list."}
-                        {tutorialStep === 7 && "Tap Select Treatment to administer care."}
-                        {tutorialStep === 8 && "Select the correct intervention. A deep laceration requires Suture & Dress."}
-                        {tutorialStep === 9 && "The patient is stable. Move them to the Discharge zone."}
+                        {tutorialStep === 3 && "Tap the Primary Triage button to assess them and move them into the department."}
+                        {tutorialStep === 4 && "They are Priority 3. They need minor treatment. Select an ED Nurse from the staff list."}
+                        {tutorialStep === 5 && "Tap Administer Treatment. The system will automatically find them a bed in Minors."}
+                        {tutorialStep === 6 && "Select the correct intervention. A deep laceration requires Suture & Dress."}
+                        {tutorialStep === 7 && "The patient is stable. Drag them to the Discharge zone (or tap the patient then tap the Discharge zone)."}
                     </TutorialOverlay>
                 )}
 
@@ -1466,23 +1450,34 @@ const App = () => {
                             {state.roleStates.map(r => { 
                                 const RoleIcon = r.icon; 
                                 const isSelected = state.currentRoleId === r.id;
-                                const isTutorialTarget = (tutorialStep === 1 && r.id === 'nurse_ic') || (tutorialStep === 6 && r.id.startsWith('nurse_staff'));
+                                const isTutorialTarget = (tutorialStep === 1 && r.id === 'nurse_ic') || (tutorialStep === 4 && r.id.startsWith('nurse_staff'));
+                                
+                                const isSeniorTarget = highlightSenior && r.id.startsWith('senior_doc') && r.currentAp > 0;
+                                const isRadiologyTarget = highlightRadiology && r.id === 'radiology' && r.currentAp > 0;
 
                                 return ( 
                                     <div 
                                         key={r.id} 
                                         onClick={() => handleRoleClick(r)} 
-                                        className={`w-full text-left px-3 py-2 rounded border-l-4 transition-all mb-1 group cursor-pointer ${isSelected ? getActiveStyle(r.theme) + ' shadow-md' : getColorStyle(r.theme) + ' bg-white border-transparent'} ${r.disabled ? 'opacity-50 bg-slate-100 cursor-not-allowed' : ''} ${r.fatigued ? 'fatigue-bg border-amber-500' : ''} ${isTutorialTarget ? 'tutorial-highlight tutorial-pointer-right' : ''}`}
+                                        className={`w-full text-left px-3 py-2 rounded border-l-4 transition-all mb-1 group cursor-pointer 
+                                            ${isSelected ? getActiveStyle(r.theme) + ' shadow-md' : getColorStyle(r.theme) + ' bg-white border-transparent'} 
+                                            ${r.disabled ? 'opacity-50 bg-slate-100 cursor-not-allowed' : ''} 
+                                            ${isTutorialTarget ? 'tutorial-highlight tutorial-pointer-right' : ''}
+                                            ${isSeniorTarget ? 'pulse-border-red' : ''}
+                                            ${isRadiologyTarget ? 'pulse-border-purple' : ''}
+                                        `}
                                     >
                                         <div className="flex justify-between items-center">
                                             <div className="flex items-center gap-2">
                                                 <div className={`p-1 rounded ${isSelected ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-white'}`}><RoleIcon size={16} strokeWidth={2.5} /></div>
                                                 <div>
                                                     <span className="font-bold text-sm block">{r.name}</span>
-                                                    <span className="text-[10px] opacity-75">{r.disabled ? 'UNAVAILABLE' : (r.fatigued ? 'FATIGUED' : r.actionText)}</span>
+                                                    <span className="text-[10px] opacity-75">{r.disabled ? 'UNAVAILABLE' : r.actionText}</span>
                                                 </div>
                                             </div>
-                                            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${r.currentAp === 0 ? 'bg-red-500 text-white' : 'bg-white/30'}`}>{r.currentAp}</span>
+                                            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${r.currentAp === 0 ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                                                {r.currentAp} AP
+                                            </span>
                                         </div>
                                         
                                         {isSelected && !r.disabled && (
@@ -1490,14 +1485,14 @@ const App = () => {
                                                 <div>
                                                     <span className="uppercase tracking-wider opacity-60 font-bold block mb-1">Ability: {r.ability}</span>
                                                     <div className="bg-black/20 p-1.5 rounded italic leading-tight mb-2">
-                                                        {r.abilityEffect} ({r.abilityCost === 'ALL' ? 'All AP' : `${r.abilityCost} AP`})
+                                                        {r.abilityEffect}
                                                     </div>
                                                         <button 
                                                         onClick={(e) => { e.stopPropagation(); handleAbility(); }}
-                                                        disabled={r.currentAp < (r.abilityCost === 'ALL' ? 1 : r.abilityCost) || tutorialStep > 0}
-                                                        className={`w-full py-2 ${r.fatigued ? 'bg-amber-600 hover:bg-amber-500' : 'bg-slate-700 hover:bg-slate-600'} text-white rounded border border-slate-500 font-bold text-xs flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+                                                        disabled={r.currentAp < (r.abilityCost === 'ALL' ? 1 : r.abilityCost) || r.cooldown > 0 || tutorialStep > 0}
+                                                        className={`w-full py-2 bg-slate-700 hover:bg-slate-600 text-white rounded border border-slate-500 font-bold text-xs flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed`}
                                                         >
-                                                        <ShieldAlert size={12} /> {r.fatigued ? 'Rest Staff' : 'Use Ability'}
+                                                        <ShieldAlert size={12} /> Use Ability {r.cooldown > 0 && `(Wait ${r.cooldown})`}
                                                         </button>
                                                 </div>
                                             </div>
@@ -1531,7 +1526,7 @@ const App = () => {
 
                             <div className="w-56 flex flex-col gap-2 shrink-0">
                                 <div className="text-[10px] font-black text-purple-400 uppercase tracking-widest text-center flex items-center justify-center gap-2"><Scan size={12}/> Inv / Tx</div>
-                                <ZoneDisplay zone={ZONES[4]} patients={state.patients} onSelect={handlePatientSelect} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={state.activeEvent} blockState={state.blockState} tutorialStep={tutorialStep} />
+                                <ZoneDisplay zone={ZONES[4]} patients={state.patients} onSelect={handlePatientSelect} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={state.activeEvent} blockState={state.blockState} tutorialStep={tutorialStep} highlightScan={highlightRadiology} />
                                 <ZoneDisplay zone={ZONES[8]} patients={state.patients} onSelect={handlePatientSelect} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={state.activeEvent} blockState={state.blockState} tutorialStep={tutorialStep} />
                             </div>
 
@@ -1542,7 +1537,7 @@ const App = () => {
                                 <div className="flex-1 flex flex-col gap-2">
                                     <ZoneDisplay zone={ZONES[7]} patients={state.patients} onSelect={handlePatientSelect} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={state.activeEvent} blockState={state.blockState} tutorialStep={tutorialStep} />
                                     <ZoneDisplay zone={ZONES[6]} patients={state.patients} onSelect={handlePatientSelect} selectedPatientId={selectedPatientId} onDrop={handleDrop} onZoneClick={handleZoneClick} activeEvent={state.activeEvent} blockState={state.blockState} tutorialStep={tutorialStep} />
-                                    <div className={`h-32 rounded-xl border-2 border-dashed bg-white flex flex-col items-center justify-center transition-colors relative ${tutorialStep === 9 ? 'tutorial-highlight tutorial-pointer-down border-emerald-500 text-emerald-600' : 'border-slate-300 text-slate-400 hover:bg-slate-50'}`} 
+                                    <div className={`h-32 rounded-xl border-2 border-dashed bg-white flex flex-col items-center justify-center transition-colors relative z-10 ${tutorialStep === 7 ? 'tutorial-highlight tutorial-pointer-down border-emerald-500 text-emerald-600' : 'border-slate-300 text-slate-400 hover:bg-slate-50'}`} 
                                         onDragOver={e => e.preventDefault()} 
                                         onDrop={e => handleDrop(e, 'discharged')}
                                         onClick={() => handleZoneClick('discharged')}
@@ -1565,7 +1560,6 @@ const App = () => {
             {state.activeEvent && !state.activeEvent.acknowledged && <EventModal event={state.activeEvent} onClose={() => { const e = {...state.activeEvent, acknowledged: true}; dispatch({ type: 'UPDATE_STATE', payload: { activeEvent: e } }); }} />}
             {state.modalContent === 'guide' && <Modal title="WMEBEM Simulation Guide" onClose={() => dispatch({ type: 'UPDATE_STATE', payload: { modalContent: null } })}><UserGuide /></Modal>}
             {triageTarget && <TriageModal patient={triageTarget} onClose={() => setTriageTarget(null)} onConfirm={handleTriageConfirm} />}
-            {secondaryTriageTarget && <TRTSModal patient={secondaryTriageTarget} onClose={() => setSecondaryTriageTarget(null)} onConfirm={handleSecondaryTriageConfirm} />}
             {treatmentTarget && <TreatmentModal patient={treatmentTarget} onClose={() => setTreatmentTarget(null)} onSelectTreatment={handleTreatmentConfirm} tutorialStep={tutorialStep} />}
         </>
     );
