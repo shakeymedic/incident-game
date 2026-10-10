@@ -74,7 +74,7 @@ const TrendingUp = (p) => <IconWrapper {...p}><polyline points="23 6 13.5 15.5 8
 const Siren = (p) => <IconWrapper {...p}><path d="M7 12a5 5 0 0 1 5-5v0a5 5 0 0 1 5 5v6H7v-6Z"/><path d="M5 20a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2H5v-2Z"/><path d="M21 12h1"/><path d="M18.5 4.5 18 5"/><path d="M2 12h1"/><path d="M12 2v1"/><path d="m4.929 4.929.707.707"/><path d="M12 7a5 5 0 0 0-5 5"/></IconWrapper>;
 const ArrowRight = (p) => <IconWrapper {...p}><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></IconWrapper>;
 
-const LOGO_URL = "https://iili.io/KGQOvkl.md.png";
+const LOGO_URL = "https://raw.githubusercontent.com/shakeymedic/wmem/main/emevidence_logo.png";
 const MAX_TURNS = 12; 
 
 const RANDOM_EVENTS = [
@@ -1581,7 +1581,7 @@ const App = () => {
         return (
             <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
                 <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center border-t-8 border-blue-800">
-                    <img src={LOGO_URL} className="h-24 mx-auto mb-6 object-contain" />
+                    <img src={LOGO_URL} alt="EM Evidence logo" className="h-24 mx-auto mb-6 object-contain" />
                     <h1 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">INCIDENT<span className="text-blue-600">COMMAND</span></h1>
                     <p className="text-slate-500 mb-6 font-medium">WMEBEM Digital Simulation</p>
                     <div className="mb-6 space-y-4 text-left">
@@ -1688,7 +1688,7 @@ const App = () => {
 
                 <div className={`h-14 ${state.phase === 'stand_down' ? 'bg-amber-400' : 'bg-white'} border-b px-4 flex items-center justify-between shrink-0 z-20 relative shadow-sm transition-colors`}>
                     <div className="flex items-center gap-3">
-                        <img src={LOGO_URL} className="logo-h" />
+                        <img src={LOGO_URL} alt="EM Evidence logo" className="logo-h" />
                         <div className="flex flex-col">
                             <span className="font-bold text-sm hidden sm:inline">Turn {state.turn} {state.phase === 'stand_down' ? '(STAND DOWN)' : `/ ${MAX_TURNS}`} ({formatTime(state.simTime)})</span>
                             <TimelineBar currentTurn={state.turn} maxTurns={MAX_TURNS} />
