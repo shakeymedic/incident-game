@@ -292,7 +292,7 @@ const generateCertificate = (playerNames, score, stats) => {
     doc.setFont("helvetica", "italic");
     doc.text("   - Key Capability: Delivery of complex care in high-pressure environments", sloX, sloY + (lineHeight * 3));
 
-    const date = new Date().toLocaleDateString();
+    const date = new Date().toLocaleDateString('en-GB');
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(150, 150, 150);
