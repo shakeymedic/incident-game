@@ -3,7 +3,7 @@
 // always gets the latest version; the cached copy is only used when the network fails
 // or takes more than a few seconds. Fonts and libraries from other sites are served
 // from the cache and refreshed in the background.
-const CACHE = 'incident-game-v1';
+const CACHE = 'incident-game-v2';
 const PRECACHE = [
   "./",
   "index.html",
@@ -15,7 +15,7 @@ const PRECACHE = [
   "icons/icon-512.png",
   "https://unpkg.com/react@18.3.1/umd/react.production.min.js",
   "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+  "https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js"
 ];
 const NETWORK_TIMEOUT_MS = 4000;
 
